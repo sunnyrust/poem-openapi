@@ -1,0 +1,39 @@
+[package]
+name = "poem-openapi"
+version = "0.1.0"
+authors = ["sunli <scott_s829@163.com>"]
+edition = "2018"
+description = "OpenAPI support for Poem."
+license = "MIT/Apache-2.0"
+documentation = "https://docs.rs/poem/"
+homepage = "https://github.com/poem-web/poem-openapi"
+repository = "https://github.com/poem-web/poem-openapi"
+keywords = ["http", "async", "openapi", "swagger"]
+categories = [
+    "network-programming",
+    "asynchronous",
+]
+
+[features]
+default = []
+
+[dependencies]
+poem-openapi-derive = { path = "derive", version = "0.1.0" }
+poem = "0.4.8"
+
+serde_json = "1.0.66"
+base64 = "0.13.0"
+indexmap = { version = "1.7.0", features = ["serde"] }
+serde = { version = "1.0.129", features = ["derive"] }
+thiserror = "1.0.28"
+askama = "0.10.5"
+
+# Feature optional dependencies
+chrono = { version = "0.4.19", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.10.1", features = ["macros", "sync", "rt-multi-thread"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
