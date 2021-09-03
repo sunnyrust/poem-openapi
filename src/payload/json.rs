@@ -2,10 +2,10 @@ use poem::{Error, IntoResponse, Request, Response, Result};
 use serde_json::Value;
 
 use crate::{
-    base::Schema,
     payload::Payload,
     poem::{FromRequest, RequestBody},
-    registry::{MetaSchemaRef, Registry},
+    registry::Registry,
+    types::{DataType, Type},
     ParseRequestError,
 };
 
@@ -14,9 +14,9 @@ use crate::{
 pub struct Json<T>(pub T);
 
 #[poem::async_trait]
-impl<T: Schema> Payload for Json<T> {
+impl<T: Type> Payload for Json<T> {
     const CONTENT_TYPE: &'static str = "application/json";
-    const SCHEMA_REF: MetaSchemaRef = MetaSchemaRef::Reference(T::NAME);
+    const DATA_TYPE: &'static DataType = &T::DATA_TYPE;
 
     #[allow(unused_variables)]
     fn register(registry: &mut Registry) {
@@ -28,8 +28,8 @@ impl<T: Schema> Payload for Json<T> {
             .await
             .map_err(Error::bad_request)?;
         let value = T::parse(Some(value.0)).map_err(|err| {
-            Error::bad_request(ParseRequestError::ParseSchema {
-                schema: T::NAME,
+            Error::bad_request(ParseRequestError::ParseRequestBody {
+                data_type: &T::DATA_TYPE,
                 reason: err.into_message(),
             })
         })?;
@@ -37,7 +37,7 @@ impl<T: Schema> Payload for Json<T> {
     }
 }
 
-impl<T: Schema> IntoResponse for Json<T> {
+impl<T: Type> IntoResponse for Json<T> {
     fn into_response(self) -> Response {
         poem::web::Json(self.0.to_value()).into_response()
     }

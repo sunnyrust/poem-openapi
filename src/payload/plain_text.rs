@@ -3,8 +3,7 @@ use poem::{IntoResponse, Request, Response, Result};
 use crate::{
     payload::Payload,
     poem::{FromRequest, RequestBody},
-    registry::MetaSchemaRef,
-    types::DataType,
+    types::{DataType, Type},
 };
 
 /// A UTF8 string payload.
@@ -20,7 +19,7 @@ impl<T: Into<String>> From<T> for PlainText {
 #[poem::async_trait]
 impl Payload for PlainText {
     const CONTENT_TYPE: &'static str = "text/plain";
-    const SCHEMA_REF: MetaSchemaRef = MetaSchemaRef::Inline(DataType::STRING);
+    const DATA_TYPE: &'static DataType = &String::DATA_TYPE;
 
     async fn from_request(request: &Request, body: &mut RequestBody) -> Result<Self> {
         Ok(Self(String::from_request(request, body).await?))

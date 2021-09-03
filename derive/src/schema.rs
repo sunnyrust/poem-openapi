@@ -1,13 +1,32 @@
-use darling::{ast::Data, util::Ignored, FromDeriveInput, FromField};
+use darling::{
+    ast::Data,
+    util::{Ignored, SpannedValue},
+    FromDeriveInput, FromField, FromMeta,
+};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
+use regex::Regex;
 use syn::{ext::IdentExt, Attribute, DeriveInput, Error, Generics, Type};
 
 use crate::{
     common_args::{ConcreteType, RenameRule, RenameRuleExt, RenameTarget},
     error::GeneratorResult,
-    utils::{get_crate_name, get_description, get_summary_and_description, optional_literal},
+    utils::{get_crate_name, get_summary_and_description, optional_literal},
 };
+
+#[derive(FromMeta)]
+struct MaximumValidator {
+    value: f64,
+    #[darling(default)]
+    exclusive: bool,
+}
+
+#[derive(FromMeta)]
+struct MinimumValidator {
+    value: f64,
+    #[darling(default)]
+    exclusive: bool,
+}
 
 #[derive(FromField)]
 #[darling(attributes(oai), forward_attrs(doc))]
@@ -20,6 +39,23 @@ struct SchemaField {
     name: Option<String>,
     #[darling(default)]
     skip: bool,
+
+    #[darling(default)]
+    multiple_of: Option<SpannedValue<f64>>,
+    #[darling(default)]
+    maximum: Option<MaximumValidator>,
+    #[darling(default)]
+    minimum: Option<MinimumValidator>,
+    #[darling(default)]
+    max_length: Option<SpannedValue<usize>>,
+    #[darling(default)]
+    min_length: Option<SpannedValue<usize>>,
+    #[darling(default)]
+    pattern: Option<SpannedValue<String>>,
+    #[darling(default)]
+    max_items: Option<SpannedValue<usize>>,
+    #[darling(default)]
+    min_items: Option<SpannedValue<usize>>,
 }
 
 #[derive(FromDeriveInput)]
@@ -82,14 +118,44 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
             args.rename_fields
                 .rename(field_ident.unraw().to_string(), RenameTarget::Field)
         });
-        let field_description = get_description(&field.attrs)?;
+        let (field_title, field_description) = get_summary_and_description(&field.attrs)?;
+        let field_title = optional_literal(&field_title);
+        let field_description = optional_literal(&field_description);
 
         fields.push(field_ident);
 
+        let validators = create_validators(&crate_name, field)?;
+
+        let validators_check = if !validators.is_empty() {
+            Some(quote! {
+                for validator in [#(#validators),*] {
+                    if !#crate_name::validation::Validator::check(&validator, &value) {
+                        return Err(#crate_name::types::ParseError::<Self>::custom(format!("field `{}` verification failed. {}", #field_name, validator)));
+                    }
+                }
+            })
+        } else {
+            None
+        };
+
+        let validators_meta = if !validators.is_empty() {
+            Some(quote! {
+                for validator in [#(#validators),*] {
+                    #crate_name::validation::Validator::<#field_ty>::update_meta(&validator, &mut meta_validators);
+                }
+            })
+        } else {
+            None
+        };
+
         deserialize_fields.push(quote! {
             #[allow(non_snake_case)]
-            let #field_ident: #field_ty = #crate_name::types::Type::parse(obj.get(#field_name).cloned())
-                .map_err(#crate_name::types::ParseError::propagate)?;
+            let #field_ident: #field_ty = {
+                let value = #crate_name::types::Type::parse(obj.get(#field_name).cloned())
+                    .map_err(#crate_name::types::ParseError::propagate)?;
+                #validators_check
+                value
+            };
         });
 
         serialize_fields.push(quote! {
@@ -97,13 +163,18 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
             object.insert(::std::string::ToString::to_string(#field_name), value);
         });
 
-        let field_description = optional_literal(&field_description);
         schema_fields.push(quote! {{
             <#field_ty>::register(registry);
+            let mut meta_validators = <#crate_name::registry::MetaValidators as ::std::default::Default>::default();
+
+            #validators_meta
+
             let property = #crate_name::registry::MetaProperty {
                 data_type: <#field_ty>::DATA_TYPE,
+                title: #field_title,
                 description: #field_description,
                 default: ::std::option::Option::None,
+                validators: meta_validators,
             };
             (#field_name, property)
         }});
@@ -122,7 +193,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
     let register_type = quote! {
         registry.create_schema::<Self, _>(|registry| {
             #crate_name::registry::MetaSchema {
-                data_type: Self::DATA_TYPE,
+                data_type: #crate_name::types::DataType::OBJECT,
                 summary: #summary,
                 description: #description,
                 required: {
@@ -139,7 +210,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
     let expanded = if args.concretes.is_empty() {
         quote! {
             impl #crate_name::types::Type for #ident {
-                const DATA_TYPE: #crate_name::types::DataType = #crate_name::types::DataType::new("object");
+                const DATA_TYPE: #crate_name::types::DataType = #crate_name::types::DataType::SchemaReference(#oai_typename);
 
                 fn parse(value: ::std::option::Option<#crate_name::serde_json::Value>) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
                     if let ::std::option::Option::Some(#crate_name::serde_json::Value::Object(obj)) = value {
@@ -211,7 +282,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
 
             let expanded = quote! {
                 impl #crate_name::types::Type for #concrete_type {
-                    const DATA_TYPE: #crate_name::types::DataType = #crate_name::types::DataType::new(#oai_typename);
+                    const DATA_TYPE: #crate_name::types::DataType = #crate_name::types::DataType::SchemaReference(#oai_typename);
 
                     fn parse(value: #crate_name::serde_json::Value) -> #crate_name::ParseResult<Self> {
                         Self::__internal_parse(value)
@@ -237,4 +308,99 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
     };
 
     Ok(expanded.into())
+}
+
+fn create_validators(
+    crate_name: &TokenStream,
+    field: &SchemaField,
+) -> GeneratorResult<Vec<TokenStream>> {
+    let mut validators = Vec::new();
+
+    if let Some(value) = &field.multiple_of {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.1
+        if &**value <= &0.0 {
+            return Err(Error::new(
+                value.span(),
+                "The value of `multipleOf` MUST be a number, strictly greater than 0.",
+            )
+            .into());
+        }
+        let value = &**value;
+        validators.push(quote!(#crate_name::validation::MultipleOf::new(#value)));
+    }
+
+    if let Some(MaximumValidator { value, exclusive }) = &field.maximum {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.2
+        validators.push(quote!(#crate_name::validation::Maximum::new(#value, #exclusive)));
+    }
+
+    if let Some(MinimumValidator { value, exclusive }) = &field.minimum {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.4
+        validators.push(quote!(#crate_name::validation::Minimum::new(#value, #exclusive)));
+    }
+
+    if let Some(value) = &field.max_length {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.6
+        if &**value < &0 {
+            return Err(Error::new(
+                value.span(),
+                "The value of `maxLength` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
+            )
+                .into());
+        }
+        let value = &**value;
+        validators.push(quote!(#crate_name::validation::MaxLength::new(#value)));
+    }
+
+    if let Some(value) = &field.min_length {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.7
+        if &**value < &0 {
+            return Err(Error::new(
+                value.span(),
+                "The value of `minLength` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
+            )
+                .into());
+        }
+        let value = &**value;
+        validators.push(quote!(#crate_name::validation::MinLength::new(#value)));
+    }
+
+    if let Some(value) = &field.pattern {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.8
+        if let Err(err) = Regex::new(&**value) {
+            return Err(
+                Error::new(value.span(), format!("Invalid regular expression. {}", err)).into(),
+            );
+        }
+        let value = &**value;
+        validators.push(quote!(#crate_name::validation::Pattern::new(#value)));
+    }
+
+    if let Some(value) = &field.max_items {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.10
+        if &**value < &0 {
+            return Err(Error::new(
+                value.span(),
+                "The value of `maxItems` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
+            )
+                .into());
+        }
+        let value = &**value;
+        validators.push(quote!(#crate_name::validation::MaxItems::new(#value)));
+    }
+
+    if let Some(value) = &field.min_items {
+        // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.11
+        if &**value < &0 {
+            return Err(Error::new(
+                value.span(),
+                "The value of `minItems` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
+            )
+                .into());
+        }
+        let value = &**value;
+        validators.push(quote!(#crate_name::validation::MinItems::new(#value)));
+    }
+
+    Ok(validators)
 }

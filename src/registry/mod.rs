@@ -12,7 +12,7 @@ use crate::{
     types::DataType,
 };
 
-#[derive(Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct MetaSchema {
     #[serde(flatten)]
     pub data_type: DataType,
@@ -27,14 +27,43 @@ pub struct MetaSchema {
     pub deprecated: bool,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaProperty {
     #[serde(flatten)]
     pub data_type: DataType,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<Value>,
+    #[serde(flatten)]
+    pub validators: MetaValidators,
+}
+
+#[derive(Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaValidators {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multiple_of: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maximum: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusive_maximum: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusive_minimum: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_length: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_length: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_items: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_items: Option<usize>,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
@@ -62,7 +91,7 @@ pub struct MetaOperationParam {
 pub struct MetaMediaType {
     #[serde(skip)]
     pub content_type: &'static str,
-    pub schema: MetaSchemaRef,
+    pub schema: &'static DataType,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -128,12 +157,6 @@ pub struct MetaOperation {
 pub struct MetaPath {
     pub path: &'static str,
     pub operations: &'static [MetaOperation],
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum MetaSchemaRef {
-    Inline(DataType),
-    Reference(&'static str),
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Serialize)]

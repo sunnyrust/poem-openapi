@@ -6,7 +6,10 @@ macro_rules! impl_type_for_floats {
     ($(($ty:ty, $format:literal)),*) => {
         $(
         impl Type for $ty {
-            const DATA_TYPE: DataType = DataType::new("number");
+            const DATA_TYPE: DataType = DataType::Normal {
+                ty: "number",
+                format: Some($format),
+            };
 
             fn parse(value: Option<Value>) -> ParseResult<Self> {
                 if let Some(Value::Number(n)) = value {
@@ -21,7 +24,7 @@ macro_rules! impl_type_for_floats {
 
             fn parse_from_str(value: Option<&str>) -> ParseResult<Self> {
                 match value {
-                    Some(value) => value.parse().map_err(|err| ParseError::custom(err)),
+                    Some(value) => value.parse().map_err(ParseError::custom),
                     None => Err(ParseError::expected_input()),
                 }
             }

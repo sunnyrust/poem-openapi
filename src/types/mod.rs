@@ -13,24 +13,33 @@ pub use password::Password;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::registry::Registry;
+use crate::{
+    registry::Registry,
+    serde::{ser::SerializeMap, Serializer},
+};
 
 /// Represents a OpenAPI data type.
 ///
 /// Reference: <https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.0.md#dataTypes>
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
-pub struct DataType {
-    /// Represents a OpenAPI data type.
-    #[serde(rename = "type")]
-    pub ty: &'static str,
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DataType {
+    /// Normal data type.
+    Normal {
+        /// Represents a OpenAPI data type.
+        ty: &'static str,
 
-    /// Represents a OpenAPI data format.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<&'static str>,
-
-    /// Represents all items of an enumerated type.
-    #[serde(rename = "enum", skip_serializing_if = "<[_]>::is_empty")]
-    pub enum_items: &'static [&'static str],
+        /// Represents a OpenAPI data format.
+        format: Option<&'static str>,
+    },
+    /// Enum data type.
+    Enum {
+        /// Represents all items of an enumerated type.
+        items: &'static [&'static str],
+    },
+    /// Array data type.
+    Array(&'static DataType),
+    /// Schema reference.
+    SchemaReference(&'static str),
 }
 
 impl Default for DataType {
@@ -39,49 +48,66 @@ impl Default for DataType {
     }
 }
 
-impl DataType {
-    /// A string type.
-    pub const STRING: DataType = DataType::new("string");
-
-    /// A binary type.
-    pub const BINARY: DataType = DataType::new("binary");
-
-    /// Create a new data type.
-    #[must_use]
-    pub const fn new(ty: &'static str) -> DataType {
-        Self {
-            ty,
-            format: None,
-            enum_items: &[],
-        }
-    }
-
-    /// Sets the format of this data type.
-    #[must_use]
-    pub const fn with_format(self, format: &'static str) -> Self {
-        Self {
-            format: Some(format),
-            ..self
-        }
-    }
-
-    /// Sets all items of enumeration type.
-    #[must_use]
-    pub const fn with_enum_items(self, items: &'static [&'static str]) -> Self {
-        Self {
-            enum_items: items,
-            ..self
+impl Display for DataType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DataType::Normal { ty, format } => match format {
+                Some(format) => write!(f, "{}(${})", ty, format),
+                None => write!(f, "{}", ty),
+            },
+            DataType::Enum { .. } => f.write_str("string"),
+            DataType::Array(data_type) => write!(f, "[{}]", data_type),
+            DataType::SchemaReference(schema) => write!(f, "{}", schema),
         }
     }
 }
 
-impl Display for DataType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.format {
-            Some(format) => write!(f, "{}({})", self.ty, format),
-            None => write!(f, "{}", self.ty),
+impl Serialize for DataType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_map(None)?;
+
+        match self {
+            DataType::Normal { ty, format } => {
+                s.serialize_entry("type", ty)?;
+                if let Some(format) = format {
+                    s.serialize_entry("format", format)?;
+                }
+            }
+            DataType::Array(data_type) => {
+                s.serialize_entry("type", "array")?;
+                s.serialize_entry("items", data_type)?;
+            }
+            DataType::Enum { items } => {
+                s.serialize_entry("type", "string")?;
+                s.serialize_entry("enum", items)?;
+            }
+            DataType::SchemaReference(schema_ref) => {
+                s.serialize_entry("$ref", &format!("#/components/schemas/{}", schema_ref))?;
+            }
         }
+
+        s.end()
     }
+}
+
+impl DataType {
+    /// A string type.
+    pub const STRING: DataType = DataType::Normal {
+        ty: "string",
+        format: None,
+    };
+
+    /// A binary type.
+    pub const BINARY: DataType = DataType::Normal {
+        ty: "binary",
+        format: None,
+    };
+
+    /// A object type.
+    pub const OBJECT: DataType = DataType::Normal {
+        ty: "object",
+        format: None,
+    };
 }
 
 /// Represents a OpenAPI type.

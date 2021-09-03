@@ -8,7 +8,7 @@ use poem_openapi::{
     payload::{Json, PlainText},
     registry::{
         MetaAPI, MetaMediaType, MetaOperation, MetaOperationParam, MetaParamIn, MetaPath,
-        MetaRequest, MetaResponse, MetaResponses, MetaSchemaRef,
+        MetaRequest, MetaResponse, MetaResponses,
     },
     types::DataType,
     OpenAPI, Request, Response, Schema, API,
@@ -97,6 +97,14 @@ impl Api {
         }
     }
 
+    #[oai(path = "/test_poem_extractor", method = "get")]
+    async fn test_poem_extractor(
+        &self,
+        #[oai(extract)] _cookie: &poem::web::CookieJar,
+    ) -> PlainText {
+        "abc".to_string().into()
+    }
+
     #[oai(path = "/test_payload_request", method = "post")]
     async fn test_payload_request(&self, payload: PlainText) -> PlainText {
         payload
@@ -132,6 +140,11 @@ impl Api {
         #[oai(name = "X-TOKEN", in = "header")] token: Option<String>,
     ) -> PlainText {
         token.unwrap_or_else(|| "def".to_string()).into()
+    }
+
+    #[oai(path = "/test_array", method = "post")]
+    async fn test_array(&self, req: Json<Vec<CreateUser>>) -> Json<Vec<CreateUser>> {
+        req
     }
 }
 
@@ -171,11 +184,11 @@ fn test_api_meta() {
                             content: &[
                                 MetaMediaType {
                                     content_type: "application/json",
-                                    schema: MetaSchemaRef::Reference("CreateUser"),
+                                    schema: &DataType::SchemaReference("CreateUser"),
                                 },
                                 MetaMediaType {
                                     content_type: "text/plain",
-                                    schema: MetaSchemaRef::Inline(DataType::STRING),
+                                    schema: &DataType::STRING,
                                 }
                             ],
                             required: true
@@ -201,10 +214,32 @@ fn test_api_meta() {
                                     status: Some(400),
                                     content: &[MetaMediaType {
                                         content_type: "text/plain",
-                                        schema: MetaSchemaRef::Inline(DataType::STRING),
+                                        schema: &DataType::STRING,
                                     }]
                                 }
                             ]
+                        },
+                        deprecated: false
+                    }]
+                },
+                MetaPath {
+                    path: "/test_poem_extractor",
+                    operations: &[MetaOperation {
+                        method: Method::GET,
+                        tags: &[],
+                        summary: None,
+                        description: None,
+                        params: &[],
+                        request: None,
+                        responses: &MetaResponses {
+                            responses: &[MetaResponse {
+                                description: None,
+                                status: Some(200),
+                                content: &[MetaMediaType {
+                                    content_type: "text/plain",
+                                    schema: &DataType::STRING,
+                                }]
+                            }]
                         },
                         deprecated: false
                     }]
@@ -221,7 +256,7 @@ fn test_api_meta() {
                             description: None,
                             content: &[MetaMediaType {
                                 content_type: "text/plain",
-                                schema: MetaSchemaRef::Inline(DataType::STRING),
+                                schema: &DataType::STRING,
                             }],
                             required: true
                         }),
@@ -231,7 +266,7 @@ fn test_api_meta() {
                                 status: Some(200),
                                 content: &[MetaMediaType {
                                     content_type: "text/plain",
-                                    schema: MetaSchemaRef::Inline(DataType::STRING),
+                                    schema: &DataType::STRING,
                                 }]
                             }]
                         },
@@ -253,7 +288,7 @@ fn test_api_meta() {
                                 status: Some(200),
                                 content: &[MetaMediaType {
                                     content_type: "text/plain",
-                                    schema: MetaSchemaRef::Inline(DataType::STRING),
+                                    schema: &DataType::STRING,
                                 }]
                             }]
                         },
@@ -301,7 +336,7 @@ fn test_api_meta() {
                                 status: Some(200),
                                 content: &[MetaMediaType {
                                     content_type: "text/plain",
-                                    schema: MetaSchemaRef::Inline(DataType::STRING),
+                                    schema: &DataType::STRING,
                                 }]
                             }]
                         },
@@ -330,7 +365,7 @@ fn test_api_meta() {
                                 status: Some(200),
                                 content: &[MetaMediaType {
                                     content_type: "text/plain",
-                                    schema: MetaSchemaRef::Inline(DataType::STRING),
+                                    schema: &DataType::STRING,
                                 }]
                             }]
                         },
@@ -359,7 +394,38 @@ fn test_api_meta() {
                                 status: Some(200),
                                 content: &[MetaMediaType {
                                     content_type: "text/plain",
-                                    schema: MetaSchemaRef::Inline(DataType::STRING),
+                                    schema: &DataType::STRING,
+                                }]
+                            }]
+                        },
+                        deprecated: false
+                    }]
+                },
+                MetaPath {
+                    path: "/test_array",
+                    operations: &[MetaOperation {
+                        method: Method::POST,
+                        tags: &[],
+                        summary: None,
+                        description: None,
+                        params: &[],
+                        request: Some(&MetaRequest {
+                            description: None,
+                            content: &[MetaMediaType {
+                                content_type: "application/json",
+                                schema: &DataType::Array(&DataType::SchemaReference("CreateUser"))
+                            }],
+                            required: true
+                        }),
+                        responses: &MetaResponses {
+                            responses: &[MetaResponse {
+                                description: None,
+                                status: Some(200),
+                                content: &[MetaMediaType {
+                                    content_type: "application/json",
+                                    schema: &DataType::Array(&DataType::SchemaReference(
+                                        "CreateUser"
+                                    ))
                                 }]
                             }]
                         },
@@ -529,4 +595,35 @@ async fn test_call() {
         .await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(resp.take_body().into_string().await.unwrap(), "def");
+
+    let mut resp = api
+        .call(
+            poem::Request::builder()
+                .method(Method::POST)
+                .uri(Uri::from_static("/test_array"))
+                .content_type("application/json")
+                .body(
+                    serde_json::to_vec(&vec![
+                        CreateUser {
+                            user: "a1".to_string(),
+                            password: "123".to_string(),
+                        },
+                        CreateUser {
+                            user: "b1".to_string(),
+                            password: "456".to_string(),
+                        },
+                    ])
+                    .unwrap(),
+                ),
+        )
+        .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&resp.take_body().into_string().await.unwrap())
+            .unwrap(),
+        serde_json::json!([
+            {"user": "a1", "password": "123"},
+            {"user": "b1", "password": "456"},
+        ])
+    );
 }

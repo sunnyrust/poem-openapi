@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::types::DataType;
+
 /// This type represents errors that occur when parsing the HTTP request.
 #[derive(Debug, Error)]
 pub enum ParseRequestError {
@@ -15,9 +17,9 @@ pub enum ParseRequestError {
 
     /// Failed to parse a schema.
     #[error("failed to parse schema: {reason}")]
-    ParseSchema {
+    ParseRequestBody {
         /// The name of the schema.
-        schema: &'static str,
+        data_type: &'static DataType,
 
         /// The reason for the error.
         reason: String,

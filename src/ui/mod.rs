@@ -6,8 +6,8 @@ use crate::poem::{
     web::Html,
 };
 
-const SWAGGER_UI_JS: &'static str = include_str!("swagger-ui-bundle.js");
-const SWAGGER_UI_CSS: &'static str = include_str!("swagger-ui.css");
+const SWAGGER_UI_JS: &str = include_str!("swagger-ui-bundle.js");
+const SWAGGER_UI_CSS: &str = include_str!("swagger-ui.css");
 
 #[derive(Template)]
 #[template(
@@ -54,7 +54,7 @@ pub fn add_ui_routes(route: Route, mut path: String, document: &str) -> Route {
         .at(
             &path,
             get(make_sync({
-                let html = UITemplate { spec: &document }.render().unwrap();
+                let html = UITemplate { spec: document }.render().unwrap();
                 move |_| Html(html.clone())
             })),
         )

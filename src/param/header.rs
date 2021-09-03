@@ -13,10 +13,10 @@ pub fn parse_from_header<T: Type>(
         .headers()
         .get(name)
         .and_then(|value| value.to_str().ok());
-    Ok(T::parse_from_str(value).map_err(|err| {
+    T::parse_from_str(value).map_err(|err| {
         Error::bad_request(ParseRequestError::ParseParam {
             name: name.to_string(),
             reason: err.into_message(),
         })
-    })?)
+    })
 }

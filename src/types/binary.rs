@@ -7,7 +7,10 @@ use super::{DataType, ParseError, ParseResult, Type};
 pub struct Base64(pub Vec<u8>);
 
 impl Type for Base64 {
-    const DATA_TYPE: DataType = DataType::new("string").with_format("byte");
+    const DATA_TYPE: DataType = DataType::Normal {
+        ty: "string",
+        format: Some("byte"),
+    };
 
     fn parse(value: Option<Value>) -> ParseResult<Self> {
         if let Some(Value::String(value)) = value {
@@ -19,7 +22,7 @@ impl Type for Base64 {
 
     fn parse_from_str(value: Option<&str>) -> ParseResult<Self> {
         match value {
-            Some(value) => Ok(Self(base64::decode(value)?.into())),
+            Some(value) => Ok(Self(base64::decode(value)?)),
             None => Err(ParseError::expected_input()),
         }
     }

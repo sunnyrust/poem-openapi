@@ -64,7 +64,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 content.push(quote! {
                     #crate_name::registry::MetaMediaType {
                         content_type: <#payload_ty as #crate_name::payload::Payload>::CONTENT_TYPE,
-                        schema: <#payload_ty as #crate_name::payload::Payload>::SCHEMA_REF,
+                        schema: &<#payload_ty as #crate_name::payload::Payload>::DATA_TYPE,
                     }
                 });
                 schemas.push(payload_ty);

@@ -3,7 +3,7 @@ mod request;
 use poem::{http::StatusCode, IntoResponse};
 use poem_openapi::{
     payload::{Json, PlainText},
-    registry::{MetaMediaType, MetaResponse, MetaResponses, MetaSchemaRef},
+    registry::{MetaMediaType, MetaResponse, MetaResponses},
     types::DataType,
     Response, Schema,
 };
@@ -45,7 +45,7 @@ async fn test_response() {
                     status: Some(400),
                     content: &[MetaMediaType {
                         content_type: "application/json",
-                        schema: MetaSchemaRef::Reference("BadRequestResult")
+                        schema: &DataType::SchemaReference("BadRequestResult")
                     }]
                 },
                 MetaResponse {
@@ -53,7 +53,7 @@ async fn test_response() {
                     status: None,
                     content: &[MetaMediaType {
                         content_type: "text/plain",
-                        schema: MetaSchemaRef::Inline(DataType::STRING),
+                        schema: &DataType::STRING,
                     }]
                 }
             ],

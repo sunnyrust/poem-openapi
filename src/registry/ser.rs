@@ -5,8 +5,7 @@ use serde::{
 };
 
 use crate::registry::{
-    MetaAPI, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaSchemaRef, MetaServer, MetaTag,
-    Registry,
+    MetaAPI, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaServer, MetaTag, Registry,
 };
 
 const OPENAPI_VERSION: &str = "3.0.0";
@@ -34,24 +33,6 @@ impl Serialize for MetaPath {
         }
 
         s.end()
-    }
-}
-
-impl Serialize for MetaSchemaRef {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            MetaSchemaRef::Inline(data_type) => {
-                let mut s = serializer.serialize_struct("Schema", 2)?;
-                s.serialize_field("type", data_type.ty)?;
-                s.serialize_field("format", &data_type.format)?;
-                s.end()
-            }
-            MetaSchemaRef::Reference(name) => {
-                let mut s = serializer.serialize_struct("Schema", 1)?;
-                s.serialize_field("$ref", &format!("#/components/schemas/{}", name))?;
-                s.end()
-            }
-        }
     }
 }
 
@@ -89,7 +70,7 @@ impl<'a> Serialize for Document<'a> {
         s.serialize_field("info", &self.info)?;
         s.serialize_field("servers", self.servers)?;
         s.serialize_field("tags", self.tags)?;
-        s.serialize_field("paths", &PathMap(&self.apis))?;
+        s.serialize_field("paths", &PathMap(self.apis))?;
         s.serialize_field(
             "components",
             &Components {

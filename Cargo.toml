@@ -27,6 +27,9 @@ indexmap = { version = "1.7.0", features = ["serde"] }
 serde = { version = "1.0.129", features = ["derive"] }
 thiserror = "1.0.28"
 askama = "0.10.5"
+derive_more = "0.99.16"
+num-traits = "0.2.14"
+regex = "1.5.4"
 
 # Feature optional dependencies
 chrono = { version = "0.4.19", optional = true }

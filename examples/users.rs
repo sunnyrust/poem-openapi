@@ -7,10 +7,13 @@ use tokio::sync::Mutex;
 #[derive(Debug, Schema, Clone, Eq, PartialEq)]
 struct User {
     /// Id
+    #[oai(max_length = 20)]
     id: String,
     /// Name
+    #[oai(max_length = 64)]
     name: String,
     /// Password
+    #[oai(max_length = 32)]
     password: Password,
 }
 

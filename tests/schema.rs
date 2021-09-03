@@ -72,6 +72,7 @@ fn test_meta() {
                     data_type: i32::DATA_TYPE,
                     description: Some("field a"),
                     default: None,
+                    validators: Default::default()
                 },
             ),
             (
@@ -80,6 +81,7 @@ fn test_meta() {
                     data_type: String::DATA_TYPE,
                     description: Some("field b\n\nA\nB\n\nC"),
                     default: None,
+                    validators: Default::default()
                 },
             ),
             (
@@ -88,6 +90,7 @@ fn test_meta() {
                     data_type: i32::DATA_TYPE,
                     description: None,
                     default: None,
+                    validators: Default::default()
                 },
             ),
         ])

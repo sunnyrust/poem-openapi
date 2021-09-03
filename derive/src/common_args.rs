@@ -87,24 +87,16 @@ impl FromMeta for PathList {
 }
 
 #[derive(Debug, Copy, Clone, FromMeta)]
+#[darling(rename_all = "lowercase")]
 pub(crate) enum APIMethod {
-    #[darling(rename = "get")]
     GET,
-    #[darling(rename = "post")]
     POST,
-    #[darling(rename = "put")]
     PUT,
-    #[darling(rename = "delete")]
     DELETE,
-    #[darling(rename = "head")]
     HEAD,
-    #[darling(rename = "options")]
     OPTIONS,
-    #[darling(rename = "connect")]
     CONNECT,
-    #[darling(rename = "patch")]
     PATCH,
-    #[darling(rename = "trace")]
     TRACE,
 }
 

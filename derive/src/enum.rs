@@ -52,7 +52,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
             return Err(Error::new_spanned(
                 &variant.ident,
                 format!(
-                    "Invalid enum variant {}.\nGraphQL enums may only contain unit variants.",
+                    "Invalid enum variant {}.\nOpenAPI enums may only contain unit variants.",
                     variant.ident
                 ),
             )
@@ -73,7 +73,9 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
 
     let expanded = quote! {
         impl #crate_name::types::Type for #ident {
-            const DATA_TYPE: #crate_name::types::DataType = #crate_name::types::DataType::new("string").with_enum_items(&[#(#enum_items),*]);
+            const DATA_TYPE: #crate_name::types::DataType = #crate_name::types::DataType::Enum {
+                items: &[#(#enum_items),*],
+            };
 
             fn parse(value: ::std::option::Option<#crate_name::serde_json::Value>) -> #crate_name::types::ParseResult<Self> {
                 if let ::std::option::Option::Some(#crate_name::serde_json::Value::String(item)) = &value {

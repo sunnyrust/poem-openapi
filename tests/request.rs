@@ -1,6 +1,6 @@
 use poem_openapi::{
     payload::{Json, PlainText},
-    registry::{MetaMediaType, MetaRequest, MetaSchemaRef},
+    registry::{MetaMediaType, MetaRequest},
     types::DataType,
     Request, Schema,
 };
@@ -29,11 +29,11 @@ async fn test_meta() {
             content: &[
                 MetaMediaType {
                     content_type: "application/json",
-                    schema: MetaSchemaRef::Reference("CreateUser"),
+                    schema: &DataType::SchemaReference("CreateUser"),
                 },
                 MetaMediaType {
                     content_type: "text/plain",
-                    schema: MetaSchemaRef::Inline(DataType::STRING),
+                    schema: &DataType::STRING,
                 }
             ],
             required: true

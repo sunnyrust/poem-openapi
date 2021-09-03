@@ -10,10 +10,10 @@ pub fn parse_from_query<T: Type>(
     query: &HashMap<String, String>,
 ) -> Result<T> {
     let value = query.get(name).map(|s| s.as_str());
-    Ok(T::parse_from_str(value).map_err(|err| {
+    T::parse_from_str(value).map_err(|err| {
         Error::bad_request(ParseRequestError::ParseParam {
             name: name.to_string(),
             reason: err.into_message(),
         })
-    })?)
+    })
 }

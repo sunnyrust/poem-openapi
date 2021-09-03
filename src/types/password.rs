@@ -9,8 +9,17 @@ use super::{DataType, ParseError, ParseResult, Type};
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Password(pub String);
 
+impl AsRef<str> for Password {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Type for Password {
-    const DATA_TYPE: DataType = DataType::new("string").with_format("password");
+    const DATA_TYPE: DataType = DataType::Normal {
+        ty: "string",
+        format: Some("password"),
+    };
 
     fn parse(value: Option<Value>) -> ParseResult<Self> {
         if let Some(Value::String(value)) = value {

@@ -3,7 +3,7 @@ use serde_json::Value;
 use crate::types::{DataType, ParseError, ParseResult, Type};
 
 impl Type for String {
-    const DATA_TYPE: DataType = DataType::new("string");
+    const DATA_TYPE: DataType = DataType::STRING;
 
     fn parse(value: Option<Value>) -> ParseResult<Self> {
         if let Some(Value::String(value)) = value {

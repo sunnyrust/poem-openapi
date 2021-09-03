@@ -4,3 +4,4 @@ mod floats;
 mod integers;
 mod optional;
 mod string;
+mod vec;

@@ -4,7 +4,10 @@ use serde_json::Value;
 use crate::types::{DataType, ParseError, ParseResult, Type};
 
 impl Type for DateTime<FixedOffset> {
-    const DATA_TYPE: DataType = DataType::new("string").with_format("date-time");
+    const DATA_TYPE: DataType = DataType::Normal {
+        ty: "string",
+        format: Some("data-time"),
+    };
 
     fn parse(value: Option<Value>) -> ParseResult<Self> {
         if let Some(Value::String(value)) = value {

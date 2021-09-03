@@ -38,6 +38,8 @@ fn to_value() {
 fn data_type() {
     assert_eq!(
         MyEnum::DATA_TYPE,
-        DataType::new("string").with_enum_items(&["A", "B", "C"])
+        DataType::Enum {
+            items: &["A", "B", "C"]
+        }
     );
 }

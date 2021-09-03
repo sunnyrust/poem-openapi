@@ -33,7 +33,7 @@ impl<T: Payload> Request for T {
         description: None,
         content: &[MetaMediaType {
             content_type: T::CONTENT_TYPE,
-            schema: T::SCHEMA_REF,
+            schema: T::DATA_TYPE,
         }],
         required: true,
     };
@@ -88,7 +88,7 @@ impl<T: Payload> Response for T {
             status: Some(200),
             content: &[MetaMediaType {
                 content_type: T::CONTENT_TYPE,
-                schema: T::SCHEMA_REF,
+                schema: T::DATA_TYPE,
             }],
         }],
     };
