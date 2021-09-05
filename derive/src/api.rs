@@ -73,7 +73,9 @@ pub(crate) fn generate(
         if let ImplItem::Method(method) = item {
             if let Some(operation_args) = parse_oai_attrs::<APIOperation>(&method.attrs)? {
                 if method.sig.asyncness.is_none() {
-                    return Err(Error::new_spanned(&method, "Must be asynchronous").into());
+                    return Err(
+                        Error::new_spanned(&method.sig.ident, "Must be asynchronous").into(),
+                    );
                 }
 
                 generate_operation(&mut ctx, &crate_name, operation_args, method)?;
@@ -295,7 +297,7 @@ fn generate_operation(
                                     Some(value) => {
                                         match #crate_name::types::Type::parse_from_str(Some(value))
                                                 .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
-                                                    name: #param_oai_typename.to_string(),
+                                                    name: ::std::string::ToString::to_string(#param_oai_typename),
                                                     reason: err.into_message(),
                                                 }))
                                         {
@@ -317,7 +319,7 @@ fn generate_operation(
                                 let value = #crate_name::param::get(#param_oai_typename, #meta_in, &request, &query.0);
                                 match #crate_name::types::Type::parse_from_str(value.as_deref())
                                         .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
-                                            name: #param_oai_typename.to_string(),
+                                            name: ::std::string::ToString::to_string(#param_oai_typename),
                                             reason: err.into_message(),
                                         }))
                                 {

@@ -112,7 +112,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
             deserialize_fields.push(quote! {
                 let #field_ident: #field_ty = ::std::default::Default::default();
             });
-            fields.push(ident);
+            fields.push(field_ident);
             continue;
         }
 
@@ -193,6 +193,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
 
         schema_fields.push(quote! {{
             <#field_ty>::register(registry);
+            #[allow(unused_mut)]
             let mut meta_validators = <#crate_name::registry::MetaValidators as ::std::default::Default>::default();
 
             #validators_meta
@@ -249,7 +250,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     }
                 }
 
-                fn parse_from_str(value: ::std::option::Option<&str>) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
+                fn parse_from_str(_value: ::std::option::Option<&str>) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
                     ::std::result::Result::Err(#crate_name::types::ParseError::not_support_parsing_from_string())
                 }
 
@@ -286,7 +287,11 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
 
         code.push(quote! {
             impl #impl_generics #ident #ty_generics #where_clause {
-                fn __internal_parse(value: #crate_name::serde_json::Value) -> #crate_name::ParseResult<Self> {
+                fn __internal_register(registry: &mut #crate_name::registry::Registry) where Self: #crate_name::Schema {
+                    #register_type
+                }
+
+                fn __internal_parse(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>>  where Self: #crate_name::Schema {
                     if let #crate_name::serde_json::Value::Object(obj) = value {
                         #(#deserialize_fields)*
                         ::std::result::Result::Ok(Self { #(#fields),* })
@@ -295,7 +300,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     }
                 }
 
-                fn __internal_to_value(&self) -> #crate_name::serde_json::Value {
+                fn __internal_to_value(&self) -> #crate_name::serde_json::Value  where Self: #crate_name::Schema {
                     let mut object = ::serde_json::Map::new();
                     #(#serialize_fields)*
                     #crate_name::serde_json::Value::Object(object)
@@ -312,20 +317,24 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 impl #crate_name::types::Type for #concrete_type {
                     const DATA_TYPE: #crate_name::types::DataType = #crate_name::types::DataType::SchemaReference(#oai_typename);
 
-                    fn parse(value: #crate_name::serde_json::Value) -> #crate_name::ParseResult<Self> {
+                    fn parse(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
                         Self::__internal_parse(value)
                     }
 
+                    fn parse_from_str(_value: ::std::option::Option<&str>) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
+                        ::std::result::Result::Err(#crate_name::types::ParseError::not_support_parsing_from_string())
+                    }
+
                     fn to_value(&self) -> #crate_name::serde_json::Value {
-                        Self::__internal_to_value()
+                        Self::__internal_to_value(self)
                     }
 
                     fn register(registry: &mut #crate_name::registry::Registry) {
-                        #register_type
+                        Self::__internal_register(registry);
                     }
                 }
 
-                impl #crate_name::SchemaType for #concrete_type {
+                impl #crate_name::Schema for #concrete_type {
                     const NAME: &'static str = #oai_typename;
                 }
             };

@@ -1,6 +1,6 @@
 use darling::FromMeta;
 use inflector::Inflector;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{Meta, NestedMeta, Path};
 
@@ -142,7 +142,7 @@ impl ParamIn {
 #[derive(Debug)]
 pub(crate) enum DefaultValue {
     Default,
-    Function(String),
+    Function(Ident),
 }
 
 impl FromMeta for DefaultValue {
@@ -151,6 +151,6 @@ impl FromMeta for DefaultValue {
     }
 
     fn from_string(value: &str) -> darling::Result<Self> {
-        Ok(DefaultValue::Function(value.to_string()))
+        Ok(DefaultValue::Function(Ident::new(value, Span::call_site())))
     }
 }

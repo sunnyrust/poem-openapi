@@ -20,8 +20,8 @@ enum MyRequest {
     CreateByPlainText(PlainText),
 }
 
-#[tokio::test]
-async fn test_meta() {
+#[test]
+fn meta() {
     assert_eq!(
         MyRequest::META,
         &MetaRequest {
@@ -42,7 +42,7 @@ async fn test_meta() {
 }
 
 #[tokio::test]
-async fn test_request() {
+async fn from_request() {
     let request = poem::Request::builder()
         .content_type("application/json")
         .body(

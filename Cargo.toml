@@ -19,7 +19,7 @@ default = []
 
 [dependencies]
 poem-openapi-derive = { path = "derive", version = "0.1.0" }
-poem = "0.4.8"
+poem = "0.4.11"
 
 serde_json = "1.0.66"
 base64 = "0.13.0"

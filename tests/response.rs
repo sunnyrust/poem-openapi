@@ -29,8 +29,8 @@ enum MyResponse {
     Default(StatusCode, PlainText),
 }
 
-#[tokio::test]
-async fn test_response() {
+#[test]
+fn meta() {
     assert_eq!(
         MyResponse::META,
         &MetaResponses {
@@ -59,7 +59,10 @@ async fn test_response() {
             ],
         },
     );
+}
 
+#[tokio::test]
+async fn into_response() {
     let resp = MyResponse::Ok.into_response();
     assert_eq!(resp.status(), StatusCode::OK);
 

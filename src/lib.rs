@@ -139,7 +139,7 @@ pub use poem_openapi_derive::Response;
 /// | name          | Object name               | string   | Y        |
 /// | rename_fields | Rename all the fields according to the given case convention. The possible values are "lowercase", "UPPERCASE", "PascalCase", "camelCase", "snake_case", "SCREAMING_SNAKE_CASE". | string   | Y        |
 /// | concretes     | Specify how the concrete type of the generic Schema should be implemented. | ConcreteType |  Y |
-/// | deprecation   | Schema deprecated          | bool     | Y        |
+/// | deprecated    | Schema deprecated          | bool     | Y        |
 ///
 /// # Field parameters
 ///
@@ -182,7 +182,7 @@ pub use poem_openapi_derive::Schema;
 /// |---------------|---------------------------|----------|----------|
 /// | path          | HTTP uri.                 | string   | N        |
 /// | method        | HTTP method. The possible values are "get", "post", "put", "delete", "head", "options", "connect", "patch", "trace". | string   | N        |
-/// | deprecation   | Operation deprecated      | bool     | Y        |
+/// | deprecated    | Operation deprecated      | bool     | Y        |
 /// | tag           | Operation tag             | string   | Y        |
 ///
 /// # Operation argument parameters
@@ -193,7 +193,7 @@ pub use poem_openapi_derive::Schema;
 /// | in            | Where to parse the parameter. The possible values are "query", "path", "header", "cookie". | string   | Y        |
 /// | extract       | It means that this parameter is a Poem extractor. | bool | Y |
 /// | desc          | Argument description      | string   | Y        |
-/// | deprecation   | Argument deprecated       | bool     | Y        |
+/// | deprecated    | Argument deprecated       | bool     | Y        |
 ///
 /// # Examples
 /// 
