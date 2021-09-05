@@ -77,14 +77,14 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 items: &[#(#enum_items),*],
             };
 
-            fn parse(value: ::std::option::Option<#crate_name::serde_json::Value>) -> #crate_name::types::ParseResult<Self> {
-                if let ::std::option::Option::Some(#crate_name::serde_json::Value::String(item)) = &value {
+            fn parse(value: #crate_name::serde_json::Value) -> #crate_name::types::ParseResult<Self> {
+                if let #crate_name::serde_json::Value::String(item) = &value {
                     match item.as_str() {
                         #(#item_to_ident,)*
-                        _ => ::std::result::Result::Err(#crate_name::types::ParseError::expected_type(value.unwrap_or_default())),
+                        _ => ::std::result::Result::Err(#crate_name::types::ParseError::expected_type(value)),
                     }
                 } else {
-                    ::std::result::Result::Err(#crate_name::types::ParseError::expected_type(value.unwrap_or_default()))
+                    ::std::result::Result::Err(#crate_name::types::ParseError::expected_type(value))
                 }
             }
 

@@ -11,8 +11,8 @@ macro_rules! impl_type_for_integers {
                 format: Some($format),
             };
 
-            fn parse(value: Option<Value>) -> ParseResult<Self> {
-                if let Some(Value::Number(n)) = value {
+            fn parse(value: Value) -> ParseResult<Self> {
+                if let Value::Number(n) = value {
                     let n = n
                         .as_i64()
                         .ok_or_else(|| ParseError::from("invalid integer"))?;
@@ -27,7 +27,7 @@ macro_rules! impl_type_for_integers {
 
                     Ok(n as Self)
                 } else {
-                    Err(ParseError::expected_type(value.unwrap_or_default()))
+                    Err(ParseError::expected_type(value))
                 }
             }
 

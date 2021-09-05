@@ -9,11 +9,9 @@ fn test_multiple_of() {
         n: i32,
     }
 
-    assert_eq!(A::parse(Some(json!({ "n": 20 }))).unwrap(), A { n: 20 });
+    assert_eq!(A::parse(json!({ "n": 20 })).unwrap(), A { n: 20 });
     assert_eq!(
-        A::parse(Some(json!({ "n": 25 })))
-            .unwrap_err()
-            .into_message(),
+        A::parse(json!({ "n": 25 })).unwrap_err().into_message(),
         "failed to parse \"A\": field `n` verification failed. multipleOf(10)"
     );
 }
@@ -26,12 +24,10 @@ fn test_maximum() {
         n: i32,
     }
 
-    assert_eq!(A::parse(Some(json!({ "n": 400 }))).unwrap(), A { n: 400 });
-    assert_eq!(A::parse(Some(json!({ "n": 500 }))).unwrap(), A { n: 500 });
+    assert_eq!(A::parse(json!({ "n": 400 })).unwrap(), A { n: 400 });
+    assert_eq!(A::parse(json!({ "n": 500 })).unwrap(), A { n: 500 });
     assert_eq!(
-        A::parse(Some(json!({ "n": 530 })))
-            .unwrap_err()
-            .into_message(),
+        A::parse(json!({ "n": 530 })).unwrap_err().into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: false)"
     );
 }
@@ -44,17 +40,13 @@ fn test_maximum_exclusive() {
         n: i32,
     }
 
-    assert_eq!(A::parse(Some(json!({ "n": 400 }))).unwrap(), A { n: 400 });
+    assert_eq!(A::parse(json!({ "n": 400 })).unwrap(), A { n: 400 });
     assert_eq!(
-        A::parse(Some(json!({ "n": 500 })))
-            .unwrap_err()
-            .into_message(),
+        A::parse(json!({ "n": 500 })).unwrap_err().into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: true)"
     );
     assert_eq!(
-        A::parse(Some(json!({ "n": 530 })))
-            .unwrap_err()
-            .into_message(),
+        A::parse(json!({ "n": 530 })).unwrap_err().into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: true)"
     );
 }
@@ -68,13 +60,13 @@ fn test_max_length() {
     }
 
     assert_eq!(
-        A::parse(Some(json!({ "value": "abcd" }))).unwrap(),
+        A::parse(json!({ "value": "abcd" })).unwrap(),
         A {
             value: "abcd".to_string()
         }
     );
     assert_eq!(
-        A::parse(Some(json!({ "value": "abcdef" })))
+        A::parse(json!({ "value": "abcdef" }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `value` verification failed. maxLength(5)"
@@ -90,13 +82,13 @@ fn test_min_length() {
     }
 
     assert_eq!(
-        A::parse(Some(json!({ "value": "abcdef" }))).unwrap(),
+        A::parse(json!({ "value": "abcdef" })).unwrap(),
         A {
             value: "abcdef".to_string()
         }
     );
     assert_eq!(
-        A::parse(Some(json!({ "value": "abcd" })))
+        A::parse(json!({ "value": "abcd" }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `value` verification failed. minLength(5)"
@@ -112,13 +104,13 @@ fn test_pattern() {
     }
 
     assert_eq!(
-        A::parse(Some(json!({ "value": "[123]" }))).unwrap(),
+        A::parse(json!({ "value": "[123]" })).unwrap(),
         A {
             value: "[123]".to_string()
         }
     );
     assert_eq!(
-        A::parse(Some(json!({ "value": "123" })))
+        A::parse(json!({ "value": "123" }))
             .unwrap_err()
             .into_message(),
         r#"failed to parse "A": field `value` verification failed. pattern("\[.*\]")"#
@@ -134,13 +126,13 @@ fn test_max_items() {
     }
 
     assert_eq!(
-        A::parse(Some(json!({ "values": ["1", "2", "3"] }))).unwrap(),
+        A::parse(json!({ "values": ["1", "2", "3"] })).unwrap(),
         A {
             values: vec!["1".to_string(), "2".to_string(), "3".to_string()],
         }
     );
     assert_eq!(
-        A::parse(Some(json!({ "values": ["1", "2", "3", "4"] })))
+        A::parse(json!({ "values": ["1", "2", "3", "4"] }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `values` verification failed. maxItems(3)"
@@ -156,7 +148,7 @@ fn test_min_items() {
     }
 
     assert_eq!(
-        A::parse(Some(json!({ "values": ["1", "2", "3", "4"] }))).unwrap(),
+        A::parse(json!({ "values": ["1", "2", "3", "4"] })).unwrap(),
         A {
             values: vec![
                 "1".to_string(),
@@ -167,7 +159,7 @@ fn test_min_items() {
         }
     );
     assert_eq!(
-        A::parse(Some(json!({ "values": ["1", "2", "3"] })))
+        A::parse(json!({ "values": ["1", "2", "3"] }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `values` verification failed. minItems(4)"

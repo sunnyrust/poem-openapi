@@ -44,11 +44,11 @@ fn parse_simple() {
     );
 
     assert_eq!(
-        Simple::parse(Some(serde_json::json!({
+        Simple::parse(serde_json::json!({
             "a": 10,
             "b": "abc",
             "c": null,
-        })))
+        }))
         .unwrap(),
         obj
     );
@@ -70,7 +70,8 @@ fn test_meta() {
                 "a",
                 MetaProperty {
                     data_type: i32::DATA_TYPE,
-                    description: Some("field a"),
+                    title: Some("field a"),
+                    description: None,
                     default: None,
                     validators: Default::default()
                 },
@@ -79,7 +80,8 @@ fn test_meta() {
                 "b",
                 MetaProperty {
                     data_type: String::DATA_TYPE,
-                    description: Some("field b\n\nA\nB\n\nC"),
+                    title: Some("field b"),
+                    description: Some("A\nB\n\nC"),
                     default: None,
                     validators: Default::default()
                 },
@@ -88,6 +90,7 @@ fn test_meta() {
                 "c",
                 MetaProperty {
                     data_type: i32::DATA_TYPE,
+                    title: None,
                     description: None,
                     default: None,
                     validators: Default::default()

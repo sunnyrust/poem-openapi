@@ -27,7 +27,7 @@ impl<T: Type> Payload for Json<T> {
         let value = poem::web::Json::<Value>::from_request(request, body)
             .await
             .map_err(Error::bad_request)?;
-        let value = T::parse(Some(value.0)).map_err(|err| {
+        let value = T::parse(value.0).map_err(|err| {
             Error::bad_request(ParseRequestError::ParseRequestBody {
                 data_type: &T::DATA_TYPE,
                 reason: err.into_message(),

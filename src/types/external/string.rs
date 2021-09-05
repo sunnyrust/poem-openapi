@@ -5,11 +5,11 @@ use crate::types::{DataType, ParseError, ParseResult, Type};
 impl Type for String {
     const DATA_TYPE: DataType = DataType::STRING;
 
-    fn parse(value: Option<Value>) -> ParseResult<Self> {
-        if let Some(Value::String(value)) = value {
+    fn parse(value: Value) -> ParseResult<Self> {
+        if let Value::String(value) = value {
             Ok(value)
         } else {
-            Err(ParseError::expected_type(value.unwrap_or_default()))
+            Err(ParseError::expected_type(value))
         }
     }
 

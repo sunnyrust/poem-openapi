@@ -12,11 +12,11 @@ impl Type for Base64 {
         format: Some("byte"),
     };
 
-    fn parse(value: Option<Value>) -> ParseResult<Self> {
-        if let Some(Value::String(value)) = value {
+    fn parse(value: Value) -> ParseResult<Self> {
+        if let Value::String(value) = value {
             Ok(Self(base64::decode(value).map_err(Error::bad_request)?))
         } else {
-            Err(ParseError::expected_type(value.unwrap_or_default()))
+            Err(ParseError::expected_type(value))
         }
     }
 

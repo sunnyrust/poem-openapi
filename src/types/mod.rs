@@ -119,7 +119,7 @@ pub trait Type: Sized + Send + Sync {
     const IS_REQUIRED: bool = true;
 
     /// Parse from [`serde_json::Value`].
-    fn parse(value: Option<Value>) -> ParseResult<Self>;
+    fn parse(value: Value) -> ParseResult<Self>;
 
     /// Parse from string.
     fn parse_from_str(value: Option<&str>) -> ParseResult<Self>;

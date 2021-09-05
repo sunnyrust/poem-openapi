@@ -5,7 +5,7 @@ use quote::{format_ident, quote};
 use syn::{AttributeArgs, Error, FnArg, ImplItem, ImplItemMethod, ItemImpl, ReturnType};
 
 use crate::{
-    common_args::{APIMethod, ParamIn},
+    common_args::{APIMethod, DefaultValue, ParamIn},
     error::GeneratorResult,
     utils::{
         convert_oai_path, get_crate_name, get_summary_and_description, optional_literal,
@@ -41,6 +41,8 @@ struct APIOperationParam {
     desc: Option<String>,
     #[darling(default)]
     deprecated: bool,
+    #[darling(default)]
+    default: Option<DefaultValue>,
 }
 
 struct Context {
@@ -215,7 +217,7 @@ fn generate_operation(
             }
         };
         let pname = format_ident!("p{}", i);
-        let arg_ty = &pat.ty.clone();
+        let arg_ty = &pat.ty;
 
         let operation_param = parse_oai_attrs::<APIOperationParam>(&pat.attrs)?;
         remove_oai_attrs(&mut pat.attrs);
@@ -224,10 +226,17 @@ fn generate_operation(
             // is poem extractor
             Some(operation_param) if operation_param.extract => {
                 parse_args.push(quote! {
-                    let #pname = <#arg_ty as #crate_name::poem::FromRequest>::from_request(&request, &mut body).await?;
+                    let #pname = match <#arg_ty as #crate_name::poem::FromRequest>::from_request(&request, &mut body).await.map_err(#crate_name::poem::Error::from) {
+                        ::std::result::Result::Ok(value) => value,
+                        ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
+                                return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
+                            },
+                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                    };
                 });
                 use_args.push(pname);
             }
+
             // is parameter
             Some(operation_param) => {
                 let param_oai_typename = match &operation_param.name {
@@ -264,34 +273,65 @@ fn generate_operation(
                     }
                 }
 
-                let parse_param = match param_in {
-                    ParamIn::Path => {
-                        quote!(#crate_name::param::parse_from_path(#param_oai_typename, &request, &query.0))
-                    }
-                    ParamIn::Query => {
-                        quote!(#crate_name::param::parse_from_query(#param_oai_typename, &request, &query.0))
-                    }
-                    ParamIn::Header => {
-                        quote!(#crate_name::param::parse_from_header(#param_oai_typename, &request, &query.0))
-                    }
-                    ParamIn::Cookie => {
-                        quote!(#crate_name::param::parse_from_cookie(#param_oai_typename, &request, &query.0))
-                    }
-                };
                 let meta_in = {
                     let ty = param_in.to_meta();
                     quote!(#crate_name::registry::MetaParamIn::#ty)
                 };
 
-                parse_args.push(quote! {
-                    let #pname = match #parse_param {
-                        ::std::result::Result::Ok(value) => value,
-                        ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
-                            return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
-                        },
-                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
-                    };
-                });
+                match &operation_param.default {
+                    Some(default_value) => {
+                        let default_value = match default_value {
+                            DefaultValue::Default => {
+                                quote!(<#arg_ty as ::std::default::Default>::default())
+                            }
+                            DefaultValue::Function(func_name) => quote!(#func_name()),
+                        };
+
+                        parse_args.push(quote! {
+                            let #pname = {
+                                let value = #crate_name::param::get(#param_oai_typename, #meta_in, &request, &query.0);
+                                let value = value.as_deref();
+                                match value {
+                                    Some(value) => {
+                                        match #crate_name::types::Type::parse_from_str(Some(value))
+                                                .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
+                                                    name: #param_oai_typename.to_string(),
+                                                    reason: err.into_message(),
+                                                }))
+                                        {
+                                            ::std::result::Result::Ok(value) => value,
+                                            ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
+                                                return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
+                                            },
+                                            ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                                        }
+                                    }
+                                    None => #default_value,
+                                }
+                            };
+                        });
+                    }
+                    None => {
+                        parse_args.push(quote! {
+                            let #pname = {
+                                let value = #crate_name::param::get(#param_oai_typename, #meta_in, &request, &query.0);
+                                match #crate_name::types::Type::parse_from_str(value.as_deref())
+                                        .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
+                                            name: #param_oai_typename.to_string(),
+                                            reason: err.into_message(),
+                                        }))
+                                {
+                                    ::std::result::Result::Ok(value) => value,
+                                    ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
+                                        return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
+                                    },
+                                    ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                                }
+                            };
+                        });
+                    }
+                }
+
                 use_args.push(pname);
 
                 let desc = optional_literal(&operation_param.desc);
@@ -307,6 +347,7 @@ fn generate_operation(
                     }
                 });
             }
+
             // is request body
             None => {
                 if has_request_payload {
@@ -316,7 +357,13 @@ fn generate_operation(
                 }
 
                 parse_args.push(quote! {
-                    let #pname = <#arg_ty as #crate_name::Request>::from_request(&request, &mut body).await?;
+                    let #pname = match <#arg_ty as #crate_name::Request>::from_request(&request, &mut body).await {
+                        ::std::result::Result::Ok(value) => value,
+                        ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
+                                return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
+                            },
+                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                    };
                 });
                 use_args.push(pname);
 

@@ -6,10 +6,10 @@ impl<T: Type> Type for Option<T> {
     const DATA_TYPE: DataType = T::DATA_TYPE;
     const IS_REQUIRED: bool = false;
 
-    fn parse(value: Option<Value>) -> ParseResult<Self> {
-        match value.unwrap_or_default() {
+    fn parse(value: Value) -> ParseResult<Self> {
+        match value {
             Value::Null => Ok(None),
-            value => Ok(Some(T::parse(Some(value)).map_err(ParseError::propagate)?)),
+            value => Ok(Some(T::parse(value).map_err(ParseError::propagate)?)),
         }
     }
 

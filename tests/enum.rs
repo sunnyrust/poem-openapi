@@ -14,15 +14,15 @@ enum MyEnum {
 #[test]
 fn parse() {
     assert_eq!(
-        MyEnum::parse(Some(Value::String("A".to_string()))).unwrap(),
+        MyEnum::parse(Value::String("A".to_string())).unwrap(),
         MyEnum::A
     );
     assert_eq!(
-        MyEnum::parse(Some(Value::String("B".to_string()))).unwrap(),
+        MyEnum::parse(Value::String("B".to_string())).unwrap(),
         MyEnum::B
     );
     assert_eq!(
-        MyEnum::parse(Some(Value::String("C".to_string()))).unwrap(),
+        MyEnum::parse(Value::String("C".to_string())).unwrap(),
         MyEnum::C
     );
 }

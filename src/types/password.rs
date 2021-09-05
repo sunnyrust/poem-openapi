@@ -21,11 +21,11 @@ impl Type for Password {
         format: Some("password"),
     };
 
-    fn parse(value: Option<Value>) -> ParseResult<Self> {
-        if let Some(Value::String(value)) = value {
+    fn parse(value: Value) -> ParseResult<Self> {
+        if let Value::String(value) = value {
             Ok(Self(value))
         } else {
-            Err(ParseError::expected_type(value.unwrap_or_default()))
+            Err(ParseError::expected_type(value))
         }
     }
 

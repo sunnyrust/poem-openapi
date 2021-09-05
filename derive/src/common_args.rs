@@ -138,3 +138,19 @@ impl ParamIn {
         }
     }
 }
+
+#[derive(Debug)]
+pub(crate) enum DefaultValue {
+    Default,
+    Function(String),
+}
+
+impl FromMeta for DefaultValue {
+    fn from_word() -> darling::Result<Self> {
+        Ok(DefaultValue::Default)
+    }
+
+    fn from_string(value: &str) -> darling::Result<Self> {
+        Ok(DefaultValue::Function(value.to_string()))
+    }
+}
