@@ -4,8 +4,8 @@ use serde_json::Value;
 use crate::{
     payload::Payload,
     poem::{FromRequest, RequestBody},
-    registry::Registry,
-    types::{DataType, Type},
+    registry::{MetaSchemaRef, Registry},
+    types::Type,
     ParseRequestError,
 };
 
@@ -16,7 +16,10 @@ pub struct Json<T>(pub T);
 #[poem::async_trait]
 impl<T: Type> Payload for Json<T> {
     const CONTENT_TYPE: &'static str = "application/json";
-    const DATA_TYPE: &'static DataType = &T::DATA_TYPE;
+
+    fn schema_ref() -> MetaSchemaRef {
+        T::schema_ref()
+    }
 
     #[allow(unused_variables)]
     fn register(registry: &mut Registry) {
@@ -29,7 +32,7 @@ impl<T: Type> Payload for Json<T> {
             .map_err(Error::bad_request)?;
         let value = T::parse(value.0).map_err(|err| {
             Error::bad_request(ParseRequestError::ParseRequestBody {
-                data_type: &T::DATA_TYPE,
+                type_name: T::NAME,
                 reason: err.into_message(),
             })
         })?;

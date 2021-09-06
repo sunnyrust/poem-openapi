@@ -1,6 +1,9 @@
 use serde_json::Value;
 
-use super::{DataType, ParseError, ParseResult, Type};
+use crate::{
+    registry::MetaSchemaRef,
+    types::{ParseError, ParseResult, Type, TypeName},
+};
 
 /// A password type.
 ///
@@ -16,10 +19,14 @@ impl AsRef<str> for Password {
 }
 
 impl Type for Password {
-    const DATA_TYPE: DataType = DataType::Normal {
+    const NAME: TypeName = TypeName::Normal {
         ty: "string",
         format: Some("password"),
     };
+
+    fn schema_ref() -> MetaSchemaRef {
+        MetaSchemaRef::Inline(Self::NAME.into())
+    }
 
     fn parse(value: Value) -> ParseResult<Self> {
         if let Value::String(value) = value {

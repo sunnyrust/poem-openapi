@@ -3,13 +3,12 @@ mod request;
 use poem::{http::StatusCode, IntoResponse};
 use poem_openapi::{
     payload::{Json, PlainText},
-    registry::{MetaMediaType, MetaResponse, MetaResponses},
-    types::DataType,
-    Response, Schema,
+    registry::{MetaMediaType, MetaResponse, MetaResponses, MetaSchema, MetaSchemaRef},
+    Object, Response,
 };
 use serde_json::Value;
 
-#[derive(Schema)]
+#[derive(Object)]
 struct BadRequestResult {
     error_code: i32,
     message: String,
@@ -32,28 +31,28 @@ enum MyResponse {
 #[test]
 fn meta() {
     assert_eq!(
-        MyResponse::META,
-        &MetaResponses {
-            responses: &[
+        MyResponse::meta(),
+        MetaResponses {
+            responses: vec![
                 MetaResponse {
                     description: Some("Ok"),
                     status: Some(200),
-                    content: &[],
+                    content: vec![],
                 },
                 MetaResponse {
                     description: Some("A\nB\n\nC"),
                     status: Some(400),
-                    content: &[MetaMediaType {
+                    content: vec![MetaMediaType {
                         content_type: "application/json",
-                        schema: &DataType::SchemaReference("BadRequestResult")
+                        schema: MetaSchemaRef::Reference("BadRequestResult")
                     }]
                 },
                 MetaResponse {
                     description: None,
                     status: None,
-                    content: &[MetaMediaType {
+                    content: vec![MetaMediaType {
                         content_type: "text/plain",
-                        schema: &DataType::STRING,
+                        schema: MetaSchemaRef::Inline(MetaSchema::new("string")),
                     }]
                 }
             ],

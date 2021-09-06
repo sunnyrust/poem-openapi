@@ -1,629 +1,306 @@
-use std::collections::HashMap;
-
 use poem::{
     http::{Method, StatusCode, Uri},
     Endpoint, Error, IntoEndpoint,
 };
 use poem_openapi::{
-    payload::{Json, PlainText},
-    registry::{
-        MetaAPI, MetaMediaType, MetaOperation, MetaOperationParam, MetaParamIn, MetaPath,
-        MetaRequest, MetaResponse, MetaResponses,
-    },
-    types::DataType,
-    OpenAPI, Request, Response, Schema, API,
+    payload::{Binary, Json, PlainText},
+    registry::{MetaAPI, MetaSchema},
+    types::Type,
+    OpenAPI, Request, Response, API,
 };
-use tokio::sync::Mutex;
-
-/// Create user schema
-#[derive(Debug, Schema, Eq, PartialEq)]
-struct CreateUser {
-    user: String,
-    password: String,
-}
-
-/// Create a new user request
-#[derive(Debug, Request, Eq, PartialEq)]
-enum CreateUserRequest {
-    CreateByJson(Json<CreateUser>),
-    CreateByPlainText(PlainText),
-}
-
-#[derive(Response)]
-#[oai(bad_request_handler = "bad_request_handler")]
-enum CreateUserResponse {
-    /// Returns when the user is successfully created.
-    #[oai(status = 200)]
-    Ok,
-    /// Returns when the user already exists.
-    #[oai(status = 409)]
-    UserAlreadyExists,
-    /// Returns when the request parameters is incorrect.
-    #[oai(status = 400)]
-    BadRequest(PlainText),
-}
-
-fn bad_request_handler(err: Error) -> CreateUserResponse {
-    CreateUserResponse::BadRequest(PlainText(format!("error: {}", err)))
-}
-
-#[derive(Default)]
-struct Api {
-    users: Mutex<HashMap<String, String>>,
-}
-
-/// Test API
-///
-/// A
-/// B
-#[API]
-impl Api {
-    /// Create a new user
-    ///
-    /// A
-    /// B
-    ///
-    /// C
-    #[oai(path = "/users", method = "post")]
-    #[allow(unused_variables)]
-    async fn create_user(
-        &self,
-        #[oai(name = "key", in = "query", desc = "api key")] key: String,
-        #[oai(name = "X-API-TOKEN", in = "header", deprecated)] api_token: Option<String>,
-        req: CreateUserRequest,
-    ) -> CreateUserResponse {
-        let mut users = self.users.lock().await;
-
-        match req {
-            CreateUserRequest::CreateByJson(req) => {
-                if users.contains_key(&req.0.user) {
-                    return CreateUserResponse::UserAlreadyExists;
-                }
-                users.insert(req.0.user, req.0.password);
-                CreateUserResponse::Ok
-            }
-            CreateUserRequest::CreateByPlainText(req) => {
-                let s = req.0.split(':').collect::<Vec<_>>();
-                if s.len() != 2 {
-                    return CreateUserResponse::BadRequest("invalid plain text request".into());
-                }
-
-                if users.contains_key(s[0]) {
-                    return CreateUserResponse::UserAlreadyExists;
-                }
-                users.insert(s[0].to_string(), s[1].to_string());
-                CreateUserResponse::Ok
-            }
-        }
-    }
-
-    #[oai(path = "/test_poem_extractor", method = "get")]
-    async fn test_poem_extractor(
-        &self,
-        #[oai(extract)] _cookie: &poem::web::CookieJar,
-    ) -> PlainText {
-        "abc".to_string().into()
-    }
-
-    #[oai(path = "/test_payload_request", method = "post")]
-    async fn test_payload_request(&self, payload: PlainText) -> PlainText {
-        payload
-    }
-
-    #[oai(path = "/test_payload_response", method = "get")]
-    async fn test_payload_response(&self) -> PlainText {
-        PlainText("abc".to_string())
-    }
-
-    #[oai(path = "/test_unit_response", method = "get")]
-    async fn test_unit_response(&self) {}
-
-    #[oai(path = "/test_path_param/:userId", method = "get")]
-    async fn test_path_param(
-        &self,
-        #[oai(name = "userId", in = "path")] user_id: String,
-    ) -> PlainText {
-        PlainText(user_id.into())
-    }
-
-    #[oai(path = "/test_header_param", method = "get")]
-    async fn test_header(
-        &self,
-        #[oai(name = "X-TOKEN", in = "header")] token: String,
-    ) -> PlainText {
-        token.into()
-    }
-
-    #[oai(path = "/test_opt_header_param", method = "get")]
-    async fn test_opt_header(
-        &self,
-        #[oai(name = "X-TOKEN", in = "header")] token: Option<String>,
-    ) -> PlainText {
-        token.unwrap_or_else(|| "def".to_string()).into()
-    }
-
-    #[oai(path = "/test_array", method = "post")]
-    async fn test_array(&self, req: Json<Vec<CreateUser>>) -> Json<Vec<CreateUser>> {
-        req
-    }
-}
-
-#[test]
-fn test_api_meta() {
-    assert_eq!(
-        Api::metadata(),
-        vec![MetaAPI {
-            paths: &[
-                MetaPath {
-                    path: "/users",
-                    operations: &[MetaOperation {
-                        method: Method::POST,
-                        tags: &[],
-                        summary: Some("Create a new user"),
-                        description: Some("A\nB\n\nC"),
-                        params: &[
-                            MetaOperationParam {
-                                name: "key",
-                                schema: DataType::STRING,
-                                in_type: MetaParamIn::Query,
-                                description: Some("api key"),
-                                required: true,
-                                deprecated: false,
-                            },
-                            MetaOperationParam {
-                                name: "X-API-TOKEN",
-                                schema: DataType::STRING,
-                                in_type: MetaParamIn::Header,
-                                description: None,
-                                required: false,
-                                deprecated: true,
-                            }
-                        ],
-                        request: Some(&MetaRequest {
-                            description: Some("Create a new user request"),
-                            content: &[
-                                MetaMediaType {
-                                    content_type: "application/json",
-                                    schema: &DataType::SchemaReference("CreateUser"),
-                                },
-                                MetaMediaType {
-                                    content_type: "text/plain",
-                                    schema: &DataType::STRING,
-                                }
-                            ],
-                            required: true
-                        }),
-                        responses: &MetaResponses {
-                            responses: &[
-                                MetaResponse {
-                                    description: Some(
-                                        "Returns when the user is successfully created."
-                                    ),
-                                    status: Some(200),
-                                    content: &[]
-                                },
-                                MetaResponse {
-                                    description: Some("Returns when the user already exists."),
-                                    status: Some(409),
-                                    content: &[]
-                                },
-                                MetaResponse {
-                                    description: Some(
-                                        "Returns when the request parameters is incorrect."
-                                    ),
-                                    status: Some(400),
-                                    content: &[MetaMediaType {
-                                        content_type: "text/plain",
-                                        schema: &DataType::STRING,
-                                    }]
-                                }
-                            ]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_poem_extractor",
-                    operations: &[MetaOperation {
-                        method: Method::GET,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[],
-                        request: None,
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[MetaMediaType {
-                                    content_type: "text/plain",
-                                    schema: &DataType::STRING,
-                                }]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_payload_request",
-                    operations: &[MetaOperation {
-                        method: Method::POST,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[],
-                        request: Some(&MetaRequest {
-                            description: None,
-                            content: &[MetaMediaType {
-                                content_type: "text/plain",
-                                schema: &DataType::STRING,
-                            }],
-                            required: true
-                        }),
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[MetaMediaType {
-                                    content_type: "text/plain",
-                                    schema: &DataType::STRING,
-                                }]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_payload_response",
-                    operations: &[MetaOperation {
-                        method: Method::GET,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[],
-                        request: None,
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[MetaMediaType {
-                                    content_type: "text/plain",
-                                    schema: &DataType::STRING,
-                                }]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_unit_response",
-                    operations: &[MetaOperation {
-                        method: Method::GET,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[],
-                        request: None,
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_path_param/{userId}",
-                    operations: &[MetaOperation {
-                        method: Method::GET,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[MetaOperationParam {
-                            name: "userId",
-                            schema: DataType::STRING,
-                            in_type: MetaParamIn::Path,
-                            description: None,
-                            required: true,
-                            deprecated: false
-                        }],
-                        request: None,
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[MetaMediaType {
-                                    content_type: "text/plain",
-                                    schema: &DataType::STRING,
-                                }]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_header_param",
-                    operations: &[MetaOperation {
-                        method: Method::GET,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[MetaOperationParam {
-                            name: "X-TOKEN",
-                            schema: DataType::STRING,
-                            in_type: MetaParamIn::Header,
-                            description: None,
-                            required: true,
-                            deprecated: false
-                        }],
-                        request: None,
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[MetaMediaType {
-                                    content_type: "text/plain",
-                                    schema: &DataType::STRING,
-                                }]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_opt_header_param",
-                    operations: &[MetaOperation {
-                        method: Method::GET,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[MetaOperationParam {
-                            name: "X-TOKEN",
-                            schema: DataType::STRING,
-                            in_type: MetaParamIn::Header,
-                            description: None,
-                            required: false,
-                            deprecated: false
-                        }],
-                        request: None,
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[MetaMediaType {
-                                    content_type: "text/plain",
-                                    schema: &DataType::STRING,
-                                }]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                },
-                MetaPath {
-                    path: "/test_array",
-                    operations: &[MetaOperation {
-                        method: Method::POST,
-                        tags: &[],
-                        summary: None,
-                        description: None,
-                        params: &[],
-                        request: Some(&MetaRequest {
-                            description: None,
-                            content: &[MetaMediaType {
-                                content_type: "application/json",
-                                schema: &DataType::Array(&DataType::SchemaReference("CreateUser"))
-                            }],
-                            required: true
-                        }),
-                        responses: &MetaResponses {
-                            responses: &[MetaResponse {
-                                description: None,
-                                status: Some(200),
-                                content: &[MetaMediaType {
-                                    content_type: "application/json",
-                                    schema: &DataType::Array(&DataType::SchemaReference(
-                                        "CreateUser"
-                                    ))
-                                }]
-                            }]
-                        },
-                        deprecated: false
-                    }]
-                }
-            ],
-        }]
-    );
-}
 
 #[tokio::test]
-async fn test_call() {
-    let api = OpenAPI::new(Api::default()).into_endpoint();
+async fn path_and_method() {
+    struct API;
 
-    let resp = api
+    #[API]
+    impl API {
+        #[oai(path = "/abc", method = "post")]
+        async fn test(&self) {}
+    }
+
+    let meta: MetaAPI = API::meta().remove(0);
+    assert_eq!(meta.paths[0].path, "/abc");
+    assert_eq!(meta.paths[0].operations[0].method, Method::POST);
+
+    let ep = OpenAPI::new(API).into_endpoint();
+    let resp = ep
         .call(
             poem::Request::builder()
                 .method(Method::POST)
-                .uri(Uri::from_static("/users?key=abc123"))
-                .content_type("application/json")
-                .body(
-                    serde_json::to_vec(&CreateUser {
-                        user: "sunli".to_string(),
-                        password: "123456".to_string(),
-                    })
-                    .unwrap(),
-                ),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
-
-    let resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::POST)
-                .uri(Uri::from_static("/users?key=abc123"))
-                .content_type("application/json")
-                .body(
-                    serde_json::to_vec(&CreateUser {
-                        user: "sunli".to_string(),
-                        password: "123456".to_string(),
-                    })
-                    .unwrap(),
-                ),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::CONFLICT);
-
-    let mut resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::POST)
-                .uri(Uri::from_static("/users"))
-                .content_type("application/json")
-                .body(
-                    serde_json::to_vec(&CreateUser {
-                        user: "sunli".to_string(),
-                        password: "123456".to_string(),
-                    })
-                    .unwrap(),
-                ),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(
-        resp.take_body().into_string().await.unwrap(),
-        r#"error: 400: failed to parse param `key`: Type "string" expects an input value."#
-    );
-
-    let resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::POST)
-                .uri(Uri::from_static("/users?key=abc123"))
-                .content_type("text/plain")
-                .body("abc:678"),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
-
-    let mut resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::POST)
-                .uri(Uri::from_static("/test_payload_request"))
-                .body("abcdef"),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(resp.take_body().into_string().await.unwrap(), "abcdef");
-
-    let mut resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::GET)
-                .uri(Uri::from_static("/test_payload_response"))
+                .uri(Uri::from_static("/abc"))
                 .finish(),
         )
         .await;
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(resp.take_body().into_string().await.unwrap(), "abc");
+}
 
-    let mut resp = api
+#[test]
+fn deprecated() {
+    struct API;
+
+    #[API]
+    impl API {
+        #[oai(path = "/abc", method = "get", deprecated)]
+        async fn test(&self) {}
+    }
+
+    let meta: MetaAPI = API::meta().remove(0);
+    assert!(meta.paths[0].operations[0].deprecated);
+}
+
+#[test]
+fn tag() {
+    struct API;
+
+    #[API]
+    impl API {
+        #[oai(path = "/abc", method = "get", tag = "a", tag = "b")]
+        async fn test(&self) {}
+    }
+
+    let meta: MetaAPI = API::meta().remove(0);
+    assert_eq!(meta.paths[0].operations[0].tags, vec!["a", "b"]);
+}
+
+#[tokio::test]
+async fn request() {
+    /// Test request
+    #[derive(Request)]
+    enum MyRequest {
+        CreateWithJson(Json<i32>),
+        CreateWithPlainText(PlainText),
+        CreateWithBinary(Binary),
+    }
+
+    struct Api;
+
+    #[API]
+    impl Api {
+        #[oai(path = "/", method = "get")]
+        async fn test(&self, req: MyRequest) {
+            match req {
+                MyRequest::CreateWithJson(value) => {
+                    assert_eq!(value.0, 100);
+                }
+                MyRequest::CreateWithPlainText(value) => {
+                    assert_eq!(value.0, "abc");
+                }
+                MyRequest::CreateWithBinary(value) => {
+                    assert_eq!(value.0, vec![1, 2, 3]);
+                }
+            }
+        }
+    }
+
+    let meta: MetaAPI = Api::meta().remove(0);
+    let meta_request = meta.paths[0].operations[0].request.as_ref().unwrap();
+    assert!(meta_request.required);
+    assert_eq!(meta_request.description, Some("Test request"));
+
+    assert_eq!(meta_request.content[0].content_type, "application/json");
+    assert_eq!(meta_request.content[0].schema, i32::schema_ref());
+
+    assert_eq!(meta_request.content[1].content_type, "text/plain");
+    assert_eq!(meta_request.content[1].schema, String::schema_ref());
+
+    assert_eq!(
+        meta_request.content[2].content_type,
+        "application/octet-stream"
+    );
+    assert_eq!(
+        meta_request.content[2].schema.unwrap_inline(),
+        &MetaSchema::new("binary")
+    );
+
+    let ep = OpenAPI::new(Api).into_endpoint();
+    let resp = ep
         .call(
             poem::Request::builder()
                 .method(Method::GET)
-                .uri(Uri::from_static("/test_unit_response"))
+                .uri(Uri::from_static("/"))
+                .content_type("application/json")
+                .body("100"),
+        )
+        .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let resp = ep
+        .call(
+            poem::Request::builder()
+                .method(Method::GET)
+                .uri(Uri::from_static("/"))
+                .content_type("text/plain")
+                .body("abc"),
+        )
+        .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let resp = ep
+        .call(
+            poem::Request::builder()
+                .method(Method::GET)
+                .uri(Uri::from_static("/"))
+                .content_type("application/octet-stream")
+                .body(vec![1, 2, 3]),
+        )
+        .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn response() {
+    #[derive(Response)]
+    enum MyResponse {
+        /// Ok
+        #[oai(status = 200)]
+        Ok,
+        /// Already exists
+        #[oai(status = 409)]
+        AlreadyExists(Json<u16>),
+        /// Default
+        Default(StatusCode, PlainText),
+    }
+
+    struct Api;
+
+    #[API]
+    impl Api {
+        #[oai(path = "/", method = "get")]
+        async fn test(&self, #[oai(name = "code", in = "query")] code: u16) -> MyResponse {
+            match code {
+                200 => MyResponse::Ok,
+                409 => MyResponse::AlreadyExists(Json(code)),
+                _ => MyResponse::Default(
+                    StatusCode::from_u16(code).unwrap(),
+                    PlainText(format!("code: {}", code)),
+                ),
+            }
+        }
+    }
+
+    let meta: MetaAPI = Api::meta().remove(0);
+    let meta_responses = &meta.paths[0].operations[0].responses;
+    assert_eq!(meta_responses.responses[0].description, Some("Ok"));
+    assert_eq!(meta_responses.responses[0].status, Some(200));
+    assert!(meta_responses.responses[0].content.is_empty());
+
+    assert_eq!(
+        meta_responses.responses[1].description,
+        Some("Already exists")
+    );
+    assert_eq!(meta_responses.responses[1].status, Some(409));
+    assert_eq!(
+        meta_responses.responses[1].content[0].content_type,
+        "application/json"
+    );
+    assert_eq!(
+        meta_responses.responses[1].content[0].schema,
+        u16::schema_ref()
+    );
+
+    assert_eq!(meta_responses.responses[2].description, Some("Default"));
+    assert_eq!(meta_responses.responses[2].status, None);
+    assert_eq!(
+        meta_responses.responses[2].content[0].content_type,
+        "text/plain"
+    );
+    assert_eq!(
+        meta_responses.responses[2].content[0].schema,
+        String::schema_ref()
+    );
+
+    let ep = OpenAPI::new(Api).into_endpoint();
+
+    let mut resp = ep
+        .call(
+            poem::Request::builder()
+                .method(Method::GET)
+                .uri(Uri::from_static("/?code=200"))
                 .finish(),
         )
         .await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(resp.take_body().into_string().await.unwrap(), "");
 
-    let mut resp = api
+    let mut resp = ep
         .call(
             poem::Request::builder()
                 .method(Method::GET)
-                .uri(Uri::from_static("/test_path_param/abc"))
+                .uri(Uri::from_static("/?code=409"))
+                .finish(),
+        )
+        .await;
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+    assert_eq!(resp.content_type(), Some("application/json"));
+    assert_eq!(resp.take_body().into_string().await.unwrap(), "409");
+
+    let mut resp = ep
+        .call(
+            poem::Request::builder()
+                .method(Method::GET)
+                .uri(Uri::from_static("/?code=404"))
+                .finish(),
+        )
+        .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    assert_eq!(resp.content_type(), Some("text/plain"));
+    assert_eq!(resp.take_body().into_string().await.unwrap(), "code: 404");
+}
+
+#[tokio::test]
+async fn bad_request_handler() {
+    #[derive(Response)]
+    #[oai(bad_request_handler = "bad_request_handler")]
+    enum MyResponse {
+        /// Ok
+        #[oai(status = 200)]
+        Ok(PlainText),
+        /// Already exists
+        #[oai(status = 400)]
+        BadRequest(PlainText),
+    }
+
+    fn bad_request_handler(err: Error) -> MyResponse {
+        MyResponse::BadRequest(format!("!!! {}", err).into())
+    }
+
+    struct Api;
+
+    #[API]
+    impl Api {
+        #[oai(path = "/", method = "get")]
+        async fn test(&self, #[oai(name = "code", in = "query")] code: u16) -> MyResponse {
+            MyResponse::Ok(format!("code: {}", code).into())
+        }
+    }
+
+    let ep = OpenAPI::new(Api).into_endpoint();
+
+    let mut resp = ep
+        .call(
+            poem::Request::builder()
+                .method(Method::GET)
+                .uri(Uri::from_static("/?code=200"))
                 .finish(),
         )
         .await;
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(resp.take_body().into_string().await.unwrap(), "abc");
+    assert_eq!(resp.content_type(), Some("text/plain"));
+    assert_eq!(resp.take_body().into_string().await.unwrap(), "code: 200");
 
-    let mut resp = api
+    let mut resp = ep
         .call(
             poem::Request::builder()
                 .method(Method::GET)
-                .header("X-TOKEN", "abc")
-                .uri(Uri::from_static("/test_header_param"))
-                .finish(),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(resp.take_body().into_string().await.unwrap(), "abc");
-
-    let resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::GET)
-                .uri(Uri::from_static("/test_header_param"))
+                .uri(Uri::from_static("/"))
                 .finish(),
         )
         .await;
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-
-    let mut resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::GET)
-                .header("X-TOKEN", "abc")
-                .uri(Uri::from_static("/test_opt_header_param"))
-                .finish(),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(resp.take_body().into_string().await.unwrap(), "abc");
-
-    let mut resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::GET)
-                .uri(Uri::from_static("/test_opt_header_param"))
-                .finish(),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(resp.take_body().into_string().await.unwrap(), "def");
-
-    let mut resp = api
-        .call(
-            poem::Request::builder()
-                .method(Method::POST)
-                .uri(Uri::from_static("/test_array"))
-                .content_type("application/json")
-                .body(
-                    serde_json::to_vec(&vec![
-                        CreateUser {
-                            user: "a1".to_string(),
-                            password: "123".to_string(),
-                        },
-                        CreateUser {
-                            user: "b1".to_string(),
-                            password: "456".to_string(),
-                        },
-                    ])
-                    .unwrap(),
-                ),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.content_type(), Some("text/plain"));
     assert_eq!(
-        serde_json::from_str::<serde_json::Value>(&resp.take_body().into_string().await.unwrap())
-            .unwrap(),
-        serde_json::json!([
-            {"user": "a1", "password": "123"},
-            {"user": "b1", "password": "456"},
-        ])
+        resp.take_body().into_string().await.unwrap(),
+        r#"!!! 400: failed to parse param `code`: Type "integer($uint16)" expects an input value."#
     );
 }

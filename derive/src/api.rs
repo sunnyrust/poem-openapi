@@ -5,12 +5,13 @@ use quote::{format_ident, quote};
 use syn::{AttributeArgs, Error, FnArg, ImplItem, ImplItemMethod, ItemImpl, ReturnType};
 
 use crate::{
-    common_args::{APIMethod, DefaultValue, ParamIn},
+    common_args::{APIMethod, DefaultValue, MaximumValidator, MinimumValidator, ParamIn},
     error::GeneratorResult,
     utils::{
         convert_oai_path, get_crate_name, get_summary_and_description, optional_literal,
         parse_oai_attrs, remove_oai_attrs,
     },
+    validators::HasValidators,
 };
 
 #[derive(FromMeta)]
@@ -43,7 +44,26 @@ struct APIOperationParam {
     deprecated: bool,
     #[darling(default)]
     default: Option<DefaultValue>,
+
+    #[darling(default)]
+    multiple_of: Option<SpannedValue<f64>>,
+    #[darling(default)]
+    maximum: Option<SpannedValue<MaximumValidator>>,
+    #[darling(default)]
+    minimum: Option<SpannedValue<MinimumValidator>>,
+    #[darling(default)]
+    max_length: Option<SpannedValue<usize>>,
+    #[darling(default)]
+    min_length: Option<SpannedValue<usize>>,
+    #[darling(default)]
+    pattern: Option<SpannedValue<String>>,
+    #[darling(default)]
+    max_items: Option<SpannedValue<usize>>,
+    #[darling(default)]
+    min_items: Option<SpannedValue<usize>>,
 }
+
+impl_has_validators!(APIOperationParam);
 
 struct Context {
     add_routes: IndexMap<String, Vec<TokenStream>>,
@@ -99,7 +119,7 @@ pub(crate) fn generate(
             paths.push(quote! {
                 #crate_name::registry::MetaPath {
                     path: #path,
-                    operations: &[#(#operation),*],
+                    operations: ::std::vec![#(#operation),*],
                 }
             });
         }
@@ -135,9 +155,9 @@ pub(crate) fn generate(
         #item_impl
 
         impl #crate_name::API for #ident {
-            fn metadata() -> ::std::vec::Vec<#crate_name::registry::MetaAPI> {
+            fn meta() -> ::std::vec::Vec<#crate_name::registry::MetaAPI> {
                 ::std::vec![#crate_name::registry::MetaAPI {
-                    paths: &[#(#paths),*],
+                    paths: ::std::vec![#(#paths),*],
                 }]
             }
 
@@ -279,6 +299,12 @@ fn generate_operation(
                     let ty = param_in.to_meta();
                     quote!(#crate_name::registry::MetaParamIn::#ty)
                 };
+                let validators_checker = operation_param
+                    .validators()
+                    .create_param_checker(&crate_name, &param_oai_typename)?;
+                let validators_update_meta = operation_param
+                    .validators()
+                    .create_update_meta(&crate_name, &arg_ty)?;
 
                 match &operation_param.default {
                     Some(default_value) => {
@@ -297,11 +323,14 @@ fn generate_operation(
                                     Some(value) => {
                                         match #crate_name::types::Type::parse_from_str(Some(value))
                                                 .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
-                                                    name: ::std::string::ToString::to_string(#param_oai_typename),
+                                                    name: #param_oai_typename,
                                                     reason: err.into_message(),
                                                 }))
                                         {
-                                            ::std::result::Result::Ok(value) => value,
+                                            ::std::result::Result::Ok(value) => {
+                                                #validators_checker
+                                                value
+                                            },
                                             ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
                                                 return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
                                             },
@@ -319,11 +348,14 @@ fn generate_operation(
                                 let value = #crate_name::param::get(#param_oai_typename, #meta_in, &request, &query.0);
                                 match #crate_name::types::Type::parse_from_str(value.as_deref())
                                         .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
-                                            name: ::std::string::ToString::to_string(#param_oai_typename),
+                                            name: #param_oai_typename,
                                             reason: err.into_message(),
                                         }))
                                 {
-                                    ::std::result::Result::Ok(value) => value,
+                                    ::std::result::Result::Ok(value) => {
+                                        #validators_checker
+                                        value
+                                    },
                                     ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
                                         return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
                                     },
@@ -334,14 +366,34 @@ fn generate_operation(
                     }
                 }
 
+                let meta_arg_default = match &operation_param.default {
+                    Some(DefaultValue::Default) => quote! {
+                        ::std::option::Option::Some(<#arg_ty as ::std::default::Default>::default().to_value())
+                    },
+                    Some(DefaultValue::Function(func_name)) => quote! {
+                        ::std::option::Option::Some(#func_name().to_value())
+                    },
+                    None => quote!(::std::option::Option::None),
+                };
+
                 use_args.push(pname);
 
                 let desc = optional_literal(&operation_param.desc);
                 let deprecated = operation_param.deprecated;
                 params_meta.push(quote! {
+                    #[allow(unused_mut)]
                     #crate_name::registry::MetaOperationParam {
                         name: #param_oai_typename,
-                        schema: <#arg_ty as #crate_name::types::Type>::DATA_TYPE,
+                        schema: {
+                            let mut schema_ref = <#arg_ty as #crate_name::types::Type>::schema_ref();
+
+                            if let #crate_name::registry::MetaSchemaRef::Inline(schema) = &mut schema_ref {
+                                schema.default = #meta_arg_default;
+                                #validators_update_meta
+                            }
+
+                            schema_ref
+                        },
                         in_type: #meta_in,
                         description: #desc,
                         required: <#arg_ty as #crate_name::types::Type>::IS_REQUIRED,
@@ -371,7 +423,7 @@ fn generate_operation(
 
                 has_request_payload = true;
                 request_meta =
-                    quote!(::std::option::Option::Some(<#arg_ty as #crate_name::Request>::META));
+                    quote!(::std::option::Option::Some(<#arg_ty as #crate_name::Request>::meta()));
                 ctx.request_types.push(quote!(#arg_ty));
             }
         }
@@ -396,13 +448,13 @@ fn generate_operation(
 
     ctx.operations.entry(oai_path).or_default().push(quote! {
         #crate_name::registry::MetaOperation {
-            tags: &[#(#tags),*],
+            tags: ::std::vec![#(#tags),*],
             method: #crate_name::poem::http::Method::#http_method,
             summary: #summary,
             description: #description,
-            params: &[#(#params_meta),*],
+            params: ::std::vec![#(#params_meta),*],
             request: #request_meta,
-            responses: <#res_ty as #crate_name::Response>::META,
+            responses: <#res_ty as #crate_name::Response>::meta(),
             deprecated: #deprecated,
         }
     });

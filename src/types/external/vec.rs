@@ -1,10 +1,18 @@
 use crate::{
+    registry::{MetaSchema, MetaSchemaRef},
     serde_json::Value,
-    types::{DataType, ParseError, ParseResult, Type},
+    types::{ParseError, ParseResult, Type, TypeName},
 };
 
 impl<T: Type> Type for Vec<T> {
-    const DATA_TYPE: DataType = DataType::Array(&T::DATA_TYPE);
+    const NAME: TypeName = TypeName::Array(&T::NAME);
+
+    fn schema_ref() -> MetaSchemaRef {
+        MetaSchemaRef::Inline(MetaSchema {
+            items: Some(Box::new(T::schema_ref())),
+            ..MetaSchema::new("array")
+        })
+    }
 
     fn parse(value: Value) -> ParseResult<Self> {
         match value {

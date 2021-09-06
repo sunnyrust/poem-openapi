@@ -1,9 +1,13 @@
-use poem_openapi::{types::Type, Schema};
+use poem::{
+    http::{StatusCode, Uri},
+    Endpoint, IntoEndpoint, Request,
+};
+use poem_openapi::{registry::MetaAPI, types::Type, Object, OpenAPI, API};
 use serde_json::json;
 
 #[test]
 fn test_multiple_of() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(multiple_of = "10")]
         n: i32,
@@ -18,7 +22,7 @@ fn test_multiple_of() {
 
 #[test]
 fn test_maximum() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(maximum(value = "500"))]
         n: i32,
@@ -34,7 +38,7 @@ fn test_maximum() {
 
 #[test]
 fn test_maximum_exclusive() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(maximum(value = "500", exclusive))]
         n: i32,
@@ -53,7 +57,7 @@ fn test_maximum_exclusive() {
 
 #[test]
 fn test_max_length() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(max_length = "5")]
         value: String,
@@ -75,7 +79,7 @@ fn test_max_length() {
 
 #[test]
 fn test_min_length() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(min_length = "5")]
         value: String,
@@ -97,7 +101,7 @@ fn test_min_length() {
 
 #[test]
 fn test_pattern() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(pattern = r#"\[.*\]"#)]
         value: String,
@@ -119,7 +123,7 @@ fn test_pattern() {
 
 #[test]
 fn test_max_items() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(max_items = "3")]
         values: Vec<String>,
@@ -141,7 +145,7 @@ fn test_max_items() {
 
 #[test]
 fn test_min_items() {
-    #[derive(Schema, Debug, Eq, PartialEq)]
+    #[derive(Object, Debug, Eq, PartialEq)]
     struct A {
         #[oai(min_items = "4")]
         values: Vec<String>,
@@ -164,4 +168,50 @@ fn test_min_items() {
             .into_message(),
         "failed to parse \"A\": field `values` verification failed. minItems(4)"
     );
+}
+
+#[tokio::test]
+async fn param_validator() {
+    struct Api;
+
+    #[API]
+    impl Api {
+        #[oai(path = "/", method = "get")]
+        async fn test(
+            &self,
+            #[oai(name = "v", in = "query", maximum(value = "100", exclusive))] _v: i32,
+        ) {
+        }
+    }
+
+    let api = OpenAPI::new(Api).into_endpoint();
+    let mut resp = api
+        .call(Request::builder().uri(Uri::from_static("/?v=999")).finish())
+        .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        resp.take_body().into_string().await.unwrap(),
+        "failed to parse param `v`: verification failed. maximum(100, exclusive: true)"
+    );
+
+    let meta: MetaAPI = Api::meta().remove(0);
+    assert_eq!(
+        meta.paths[0].operations[0].params[0]
+            .schema
+            .unwrap_inline()
+            .maximum,
+        Some(100.0)
+    );
+    assert_eq!(
+        meta.paths[0].operations[0].params[0]
+            .schema
+            .unwrap_inline()
+            .exclusive_maximum,
+        Some(true)
+    );
+
+    let resp = api
+        .call(Request::builder().uri(Uri::from_static("/?v=50")).finish())
+        .await;
+    assert_eq!(resp.status(), StatusCode::OK);
 }

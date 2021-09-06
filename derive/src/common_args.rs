@@ -154,3 +154,17 @@ impl FromMeta for DefaultValue {
         Ok(DefaultValue::Function(Ident::new(value, Span::call_site())))
     }
 }
+
+#[derive(FromMeta)]
+pub(crate) struct MaximumValidator {
+    pub(crate) value: f64,
+    #[darling(default)]
+    pub(crate) exclusive: bool,
+}
+
+#[derive(FromMeta)]
+pub(crate) struct MinimumValidator {
+    pub(crate) value: f64,
+    #[darling(default)]
+    pub(crate) exclusive: bool,
+}

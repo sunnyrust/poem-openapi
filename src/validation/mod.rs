@@ -18,10 +18,10 @@ pub use minimum::Minimum;
 pub use multiple_of::MultipleOf;
 pub use pattern::Pattern;
 
-use crate::registry::MetaValidators;
+use crate::registry::MetaSchema;
 
 pub trait Validator<T>: Display {
     fn check(&self, value: &T) -> bool;
 
-    fn update_meta(&self, meta: &mut MetaValidators);
+    fn update_meta(&self, meta: &mut MetaSchema);
 }

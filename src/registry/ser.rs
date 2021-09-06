@@ -1,14 +1,29 @@
-use indexmap::IndexMap;
+use std::collections::HashMap;
+
 use serde::{
     ser::{SerializeMap, SerializeStruct},
     Serialize, Serializer,
 };
 
 use crate::registry::{
-    MetaAPI, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaServer, MetaTag, Registry,
+    MetaAPI, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaSchemaRef, MetaServer, MetaTag,
+    Registry,
 };
 
 const OPENAPI_VERSION: &str = "3.0.0";
+
+impl<'a> Serialize for MetaSchemaRef {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            MetaSchemaRef::Inline(schema) => schema.serialize(serializer),
+            MetaSchemaRef::Reference(name) => {
+                let mut s = serializer.serialize_struct("MetaSchemaRef", 1)?;
+                s.serialize_field("$ref", &format!("#/components/schemas/{}", name))?;
+                s.end()
+            }
+        }
+    }
+}
 
 struct PathMap<'a>(&'a [MetaAPI]);
 
@@ -16,7 +31,7 @@ impl<'a> Serialize for PathMap<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut s = serializer.serialize_map(Some(self.0.len()))?;
         for api in self.0 {
-            for path in api.paths {
+            for path in &api.paths {
                 s.serialize_entry(path.path, path)?;
             }
         }
@@ -28,7 +43,7 @@ impl Serialize for MetaPath {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut s = serializer.serialize_map(None)?;
 
-        for operation in self.operations {
+        for operation in &self.operations {
             s.serialize_entry(&operation.method.to_string().to_lowercase(), operation)?;
         }
 
@@ -39,7 +54,7 @@ impl Serialize for MetaPath {
 impl Serialize for MetaResponses {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut s = serializer.serialize_map(None)?;
-        for resp in self.responses {
+        for resp in &self.responses {
             match resp.status {
                 Some(status) => s.serialize_entry(&format!("{}", status), resp)?,
                 None => s.serialize_entry("default", resp)?,
@@ -61,7 +76,7 @@ impl<'a> Serialize for Document<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         #[derive(Serialize)]
         struct Components<'a> {
-            schemas: &'a IndexMap<&'static str, MetaSchema>,
+            schemas: &'a HashMap<&'static str, MetaSchema>,
         }
 
         let mut s = serializer.serialize_struct("OpenAPI", 6)?;

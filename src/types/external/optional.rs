@@ -1,10 +1,17 @@
 use serde_json::Value;
 
-use crate::types::{DataType, ParseError, ParseResult, Type};
+use crate::{
+    registry::MetaSchemaRef,
+    types::{ParseError, ParseResult, Type, TypeName},
+};
 
 impl<T: Type> Type for Option<T> {
-    const DATA_TYPE: DataType = T::DATA_TYPE;
+    const NAME: TypeName = T::NAME;
     const IS_REQUIRED: bool = false;
+
+    fn schema_ref() -> MetaSchemaRef {
+        T::schema_ref()
+    }
 
     fn parse(value: Value) -> ParseResult<Self> {
         match value {

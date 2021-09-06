@@ -1,13 +1,15 @@
 //! Commonly used payload types.
 
+mod binary;
 mod json;
 mod plain_text;
 
+pub use binary::Binary;
 pub use json::Json;
 pub use plain_text::PlainText;
 use poem::{IntoResponse, Request, RequestBody, Result};
 
-use crate::{registry::Registry, types::DataType};
+use crate::registry::{MetaSchemaRef, Registry};
 
 /// Represents a payload type.
 #[poem::async_trait]
@@ -15,8 +17,8 @@ pub trait Payload: IntoResponse + Sized {
     /// The content type of this payload.
     const CONTENT_TYPE: &'static str;
 
-    /// The data type of this payload.
-    const DATA_TYPE: &'static DataType;
+    /// Gets schema reference of this payload.
+    fn schema_ref() -> MetaSchemaRef;
 
     /// Register the schema contained in this payload to the registry.
     #[allow(unused_variables)]

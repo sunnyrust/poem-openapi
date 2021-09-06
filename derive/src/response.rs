@@ -73,9 +73,9 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     #crate_name::registry::MetaResponse {
                         description: #item_description,
                         status: ::std::option::Option::None,
-                        content: &[#crate_name::registry::MetaMediaType {
+                        content: ::std::vec![#crate_name::registry::MetaMediaType {
                             content_type: <#payload_ty as #crate_name::payload::Payload>::CONTENT_TYPE,
-                            schema: <#payload_ty as #crate_name::payload::Payload>::DATA_TYPE,
+                            schema: <#payload_ty as #crate_name::payload::Payload>::schema_ref(),
                         }]
                     }
                 });
@@ -97,9 +97,9 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     #crate_name::registry::MetaResponse {
                         description: #item_description,
                         status: ::std::option::Option::Some(#status),
-                        content: &[#crate_name::registry::MetaMediaType {
+                        content: ::std::vec![#crate_name::registry::MetaMediaType {
                             content_type: <#payload_ty as #crate_name::payload::Payload>::CONTENT_TYPE,
-                            schema: <#payload_ty as #crate_name::payload::Payload>::DATA_TYPE,
+                            schema: <#payload_ty as #crate_name::payload::Payload>::schema_ref(),
                         }]
                     }
                 });
@@ -119,7 +119,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     #crate_name::registry::MetaResponse {
                         description: #item_description,
                         status: ::std::option::Option::Some(#status),
-                        content: &[],
+                        content: ::std::vec![],
                     }
                 });
             }
@@ -162,10 +162,13 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
             }
 
             impl #crate_name::Response for #ident {
-                const META: &'static #crate_name::registry::MetaResponses = &#crate_name::registry::MetaResponses {
-                    responses: &[#(#responses_meta),*],
-                };
                 #bad_request_handler_const
+
+                fn meta() -> #crate_name::registry::MetaResponses {
+                    #crate_name::registry::MetaResponses {
+                        responses: ::std::vec![#(#responses_meta),*],
+                    }
+                }
 
                 fn register(registry: &mut #crate_name::registry::Registry) {
                     #(<#schemas as #crate_name::payload::Payload>::register(registry);)*

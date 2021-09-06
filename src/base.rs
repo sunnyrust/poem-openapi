@@ -3,22 +3,15 @@ use poem::{route::Route, Error, IntoResponse, RequestBody, Result};
 use crate::{
     payload::Payload,
     registry::{MetaAPI, MetaMediaType, MetaRequest, MetaResponse, MetaResponses, Registry},
-    types::Type,
 };
-
-/// Represents a OpenAPI schema.
-pub trait Schema: Type {
-    /// The name of this schema type.
-    const NAME: &'static str;
-}
 
 /// Represents a OpenAPI request object.
 ///
 /// Reference: <https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.0.md#requestBodyObject>
 #[poem::async_trait]
 pub trait Request: Sized {
-    /// The metadata of this request type.
-    const META: &'static MetaRequest;
+    /// Gets metadata of this request.
+    fn meta() -> MetaRequest;
 
     /// Register the schema contained in this request object to the registry.
     fn register(registry: &mut Registry);
@@ -29,14 +22,16 @@ pub trait Request: Sized {
 
 #[poem::async_trait]
 impl<T: Payload> Request for T {
-    const META: &'static MetaRequest = &MetaRequest {
-        description: None,
-        content: &[MetaMediaType {
-            content_type: T::CONTENT_TYPE,
-            schema: T::DATA_TYPE,
-        }],
-        required: true,
-    };
+    fn meta() -> MetaRequest {
+        MetaRequest {
+            description: None,
+            content: vec![MetaMediaType {
+                content_type: T::CONTENT_TYPE,
+                schema: T::schema_ref(),
+            }],
+            required: true,
+        }
+    }
 
     fn register(registry: &mut Registry) {
         T::register(registry);
@@ -51,12 +46,12 @@ impl<T: Payload> Request for T {
 ///
 /// Reference: <https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.0.md#responsesObject>
 pub trait Response: IntoResponse + Sized {
-    /// The metadata of this request type.
-    const META: &'static MetaResponses;
-
     /// If true, it means that the response object has a custom bad request
     /// handler.
-    const BAD_REQUEST_HANDLER: bool;
+    const BAD_REQUEST_HANDLER: bool = false;
+
+    /// Gets metadata of this response.
+    fn meta() -> MetaResponses;
 
     /// Register the schema contained in this response object to the registry.
     fn register(registry: &mut Registry);
@@ -69,30 +64,32 @@ pub trait Response: IntoResponse + Sized {
 }
 
 impl Response for () {
-    const META: &'static MetaResponses = &MetaResponses {
-        responses: &[MetaResponse {
-            description: None,
-            status: Some(200),
-            content: &[],
-        }],
-    };
-    const BAD_REQUEST_HANDLER: bool = false;
+    fn meta() -> MetaResponses {
+        MetaResponses {
+            responses: vec![MetaResponse {
+                description: None,
+                status: Some(200),
+                content: vec![],
+            }],
+        }
+    }
 
     fn register(_registry: &mut Registry) {}
 }
 
 impl<T: Payload> Response for T {
-    const META: &'static MetaResponses = &MetaResponses {
-        responses: &[MetaResponse {
-            description: None,
-            status: Some(200),
-            content: &[MetaMediaType {
-                content_type: T::CONTENT_TYPE,
-                schema: T::DATA_TYPE,
+    fn meta() -> MetaResponses {
+        MetaResponses {
+            responses: vec![MetaResponse {
+                description: None,
+                status: Some(200),
+                content: vec![MetaMediaType {
+                    content_type: T::CONTENT_TYPE,
+                    schema: T::schema_ref(),
+                }],
             }],
-        }],
-    };
-    const BAD_REQUEST_HANDLER: bool = false;
+        }
+    }
 
     fn register(registry: &mut Registry) {
         T::register(registry);
@@ -102,7 +99,7 @@ impl<T: Payload> Response for T {
 /// Represents a OpenAPI object.
 pub trait API: Sized {
     /// Gets metadata of this API object.
-    fn metadata() -> Vec<MetaAPI>;
+    fn meta() -> Vec<MetaAPI>;
 
     /// Register some types to the registry.
     fn register(registry: &mut Registry);
@@ -120,9 +117,9 @@ pub trait API: Sized {
 pub struct CombinedAPI<A, B>(A, B);
 
 impl<A: API, B: API> API for CombinedAPI<A, B> {
-    fn metadata() -> Vec<MetaAPI> {
-        let mut metadata = A::metadata();
-        metadata.extend(B::metadata());
+    fn meta() -> Vec<MetaAPI> {
+        let mut metadata = A::meta();
+        metadata.extend(B::meta());
         metadata
     }
 

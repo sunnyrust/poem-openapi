@@ -121,7 +121,7 @@ impl<T: API> IntoEndpoint for OpenAPI<T> {
 
         if let Some(ui_path) = self.ui_path {
             let mut registry = Registry::new();
-            let metadata = T::metadata();
+            let metadata = T::meta();
 
             T::register(&mut registry);
 

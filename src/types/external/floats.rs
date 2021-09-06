@@ -1,15 +1,22 @@
 use serde_json::{Number, Value};
 
-use crate::types::{DataType, ParseError, ParseResult, Type};
+use crate::{
+    registry::MetaSchemaRef,
+    types::{ParseError, ParseResult, Type, TypeName},
+};
 
 macro_rules! impl_type_for_floats {
     ($(($ty:ty, $format:literal)),*) => {
         $(
         impl Type for $ty {
-            const DATA_TYPE: DataType = DataType::Normal {
+            const NAME: TypeName = TypeName::Normal {
                 ty: "number",
                 format: Some($format),
             };
+
+            fn schema_ref() -> MetaSchemaRef {
+                MetaSchemaRef::Inline(Self::NAME.into())
+            }
 
             fn parse(value: Value) -> ParseResult<Self> {
                 if let Value::Number(n) = value {

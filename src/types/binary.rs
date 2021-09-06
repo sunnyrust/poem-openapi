@@ -1,16 +1,23 @@
 use poem::Error;
 use serde_json::Value;
 
-use super::{DataType, ParseError, ParseResult, Type};
+use crate::{
+    registry::MetaSchemaRef,
+    types::{ParseError, ParseResult, Type, TypeName},
+};
 
 /// Represents a binary data encoded with base64.
 pub struct Base64(pub Vec<u8>);
 
 impl Type for Base64 {
-    const DATA_TYPE: DataType = DataType::Normal {
+    const NAME: TypeName = TypeName::Normal {
         ty: "string",
-        format: Some("byte"),
+        format: Some("bytes"),
     };
+
+    fn schema_ref() -> MetaSchemaRef {
+        MetaSchemaRef::Inline(Self::NAME.into())
+    }
 
     fn parse(value: Value) -> ParseResult<Self> {
         if let Value::String(value) = value {

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use derive_more::Display;
 
-use crate::{registry::MetaValidators, types::Type, validation::Validator};
+use crate::{registry::MetaSchema, types::Type, validation::Validator};
 
 #[derive(Display)]
 #[display(fmt = "maxItems({})", len)]
@@ -23,7 +23,7 @@ impl<T: Deref<Target = [E]>, E: Type> Validator<T> for MaxItems {
         value.deref().len() <= self.len
     }
 
-    fn update_meta(&self, meta: &mut MetaValidators) {
+    fn update_meta(&self, meta: &mut MetaSchema) {
         meta.max_items = Some(self.len);
     }
 }

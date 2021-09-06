@@ -1,11 +1,10 @@
 use poem_openapi::{
     payload::{Json, PlainText},
-    registry::{MetaMediaType, MetaRequest},
-    types::DataType,
-    Request, Schema,
+    registry::{MetaMediaType, MetaRequest, MetaSchema, MetaSchemaRef},
+    Object, Request,
 };
 
-#[derive(Debug, Schema, Eq, PartialEq)]
+#[derive(Debug, Object, Eq, PartialEq)]
 struct CreateUser {
     user: String,
     password: String,
@@ -23,17 +22,17 @@ enum MyRequest {
 #[test]
 fn meta() {
     assert_eq!(
-        MyRequest::META,
-        &MetaRequest {
+        MyRequest::meta(),
+        MetaRequest {
             description: Some("MyRequest\n\nABC"),
-            content: &[
+            content: vec![
                 MetaMediaType {
                     content_type: "application/json",
-                    schema: &DataType::SchemaReference("CreateUser"),
+                    schema: MetaSchemaRef::Reference("CreateUser"),
                 },
                 MetaMediaType {
                     content_type: "text/plain",
-                    schema: &DataType::STRING,
+                    schema: MetaSchemaRef::Inline(MetaSchema::new("string")),
                 }
             ],
             required: true

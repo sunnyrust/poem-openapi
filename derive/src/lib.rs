@@ -1,21 +1,24 @@
 //! Macros for poem-openapi
 
+#[macro_use]
+mod validators;
+
 mod api;
 mod common_args;
 mod r#enum;
 mod error;
+mod object;
 mod request;
 mod response;
-mod schema;
 mod utils;
 
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, AttributeArgs, DeriveInput, ItemImpl};
 
-#[proc_macro_derive(Schema, attributes(oai))]
-pub fn derive_schema(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Object, attributes(oai))]
+pub fn derive_object(input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(input as DeriveInput);
-    match schema::generate(args) {
+    match object::generate(args) {
         Ok(stream) => stream.into(),
         Err(err) => err.write_errors().into(),
     }

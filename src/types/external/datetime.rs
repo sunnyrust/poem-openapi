@@ -1,13 +1,20 @@
 use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
 
-use crate::types::{DataType, ParseError, ParseResult, Type};
+use crate::{
+    registry::MetaSchemaRef,
+    types::{ParseError, ParseResult, Type, TypeName},
+};
 
 impl Type for DateTime<FixedOffset> {
-    const DATA_TYPE: DataType = DataType::Normal {
+    const NAME: TypeName = TypeName::Normal {
         ty: "string",
         format: Some("data-time"),
     };
+
+    fn schema_ref() -> MetaSchemaRef {
+        MetaSchemaRef::Inline(Self::NAME.into())
+    }
 
     fn parse(value: Value) -> ParseResult<Self> {
         if let Value::String(value) = value {

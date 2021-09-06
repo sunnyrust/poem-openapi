@@ -1,9 +1,19 @@
 use serde_json::Value;
 
-use crate::types::{DataType, ParseError, ParseResult, Type};
+use crate::{
+    registry::MetaSchemaRef,
+    types::{ParseError, ParseResult, Type, TypeName},
+};
 
 impl Type for String {
-    const DATA_TYPE: DataType = DataType::STRING;
+    const NAME: TypeName = TypeName::Normal {
+        ty: "string",
+        format: None,
+    };
+
+    fn schema_ref() -> MetaSchemaRef {
+        MetaSchemaRef::Inline(Self::NAME.into())
+    }
 
     fn parse(value: Value) -> ParseResult<Self> {
         if let Value::String(value) = value {

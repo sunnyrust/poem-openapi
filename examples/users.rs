@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use poem_openapi::{payload::Json, types::Password, OpenAPI, Response, Schema, API};
+use poem_openapi::{payload::Json, types::Password, Object, OpenAPI, Response, API};
 use tokio::sync::Mutex;
 
 /// Create user schema
-#[derive(Debug, Schema, Clone, Eq, PartialEq)]
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
 struct User {
     /// Id
     #[oai(max_length = 20)]
@@ -18,7 +18,7 @@ struct User {
 }
 
 /// Update user schema
-#[derive(Debug, Schema, Clone, Eq, PartialEq)]
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
 struct UpdateUser {
     /// Name
     name: Option<String>,
@@ -88,7 +88,7 @@ impl Api {
     #[oai(path = "/users/:user_id", method = "get", tag = "user")]
     async fn find_user(
         &self,
-        #[oai(name = "user_id", in = "path")] user_id: String,
+        #[oai(name = "user_id", in = "path", max_length = 20)] user_id: String,
     ) -> FindUserResponse {
         let users = self.users.lock().await;
         match users.get(&user_id) {
@@ -101,7 +101,7 @@ impl Api {
     #[oai(path = "/users/:user_id", method = "delete", tag = "user")]
     async fn delete_user(
         &self,
-        #[oai(name = "user_id", in = "path")] user_id: String,
+        #[oai(name = "user_id", in = "path", max_length = 20)] user_id: String,
     ) -> DeleteUserResponse {
         let mut users = self.users.lock().await;
         match users.remove(&user_id) {
@@ -114,7 +114,7 @@ impl Api {
     #[oai(path = "/users/:user_id", method = "put", tag = "user")]
     async fn put_user(
         &self,
-        #[oai(name = "user_id", in = "path")] user_id: String,
+        #[oai(name = "user_id", in = "path", max_length = 20)] user_id: String,
         update: Json<UpdateUser>,
     ) -> UpdateUserResponse {
         let mut users = self.users.lock().await;

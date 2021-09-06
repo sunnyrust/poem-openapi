@@ -3,34 +3,33 @@ use poem::{IntoResponse, Request, Response, Result};
 use crate::{
     payload::Payload,
     poem::{FromRequest, RequestBody},
-    registry::MetaSchemaRef,
-    types::Type,
+    registry::{MetaSchema, MetaSchemaRef},
 };
 
-/// A UTF8 string payload.
+/// A binary payload.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PlainText(pub String);
+pub struct Binary(pub Vec<u8>);
 
-impl<T: Into<String>> From<T> for PlainText {
+impl<T: Into<Vec<u8>>> From<T> for Binary {
     fn from(value: T) -> Self {
         Self(value.into())
     }
 }
 
 #[poem::async_trait]
-impl Payload for PlainText {
-    const CONTENT_TYPE: &'static str = "text/plain";
+impl Payload for Binary {
+    const CONTENT_TYPE: &'static str = "application/octet-stream";
 
     fn schema_ref() -> MetaSchemaRef {
-        String::schema_ref()
+        MetaSchemaRef::Inline(MetaSchema::new("binary"))
     }
 
     async fn from_request(request: &Request, body: &mut RequestBody) -> Result<Self> {
-        Ok(Self(String::from_request(request, body).await?))
+        Ok(Self(<Vec<u8>>::from_request(request, body).await?))
     }
 }
 
-impl IntoResponse for PlainText {
+impl IntoResponse for Binary {
     fn into_response(self) -> Response {
         Response::builder()
             .content_type(Self::CONTENT_TYPE)

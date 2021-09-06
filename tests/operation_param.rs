@@ -1,15 +1,44 @@
 use poem::{
-    http::{header, StatusCode, Uri},
+    http::{header, Method, StatusCode, Uri},
     web::Cookie,
     Endpoint, IntoEndpoint, Request,
 };
 use poem_openapi::{
-    registry::{MetaAPI, MetaParamIn},
+    registry::{MetaAPI, MetaParamIn, MetaSchema, MetaSchemaRef},
+    types::Type,
     OpenAPI, API,
 };
+use serde_json::json;
 
 fn default_i32() -> i32 {
     999
+}
+
+#[tokio::test]
+async fn param_name() {
+    struct API;
+
+    #[API]
+    impl API {
+        #[oai(path = "/abc", method = "get")]
+        async fn test(&self, #[oai(name = "a", in = "query")] a: i32) {
+            assert_eq!(a, 10);
+        }
+    }
+
+    let meta: MetaAPI = API::meta().remove(0);
+    assert_eq!(meta.paths[0].operations[0].params[0].name, "a");
+
+    let ep = OpenAPI::new(API).into_endpoint();
+    let resp = ep
+        .call(
+            Request::builder()
+                .method(Method::GET)
+                .uri(Uri::from_static("/abc?a=10"))
+                .finish(),
+        )
+        .await;
+    assert_eq!(resp.status(), StatusCode::OK);
 }
 
 #[tokio::test]
@@ -24,7 +53,7 @@ async fn query() {
         }
     }
 
-    let meta: MetaAPI = Api::metadata().remove(0);
+    let meta: MetaAPI = Api::meta().remove(0);
     assert_eq!(
         meta.paths[0].operations[0].params[0].in_type,
         MetaParamIn::Query
@@ -32,9 +61,10 @@ async fn query() {
     assert_eq!(meta.paths[0].operations[0].params[0].name, "v");
 
     let api = OpenAPI::new(Api).into_endpoint();
-    let resp = api
-        .call(Request::builder().uri(Uri::from_static("/?a=10")).finish())
+    let mut resp = api
+        .call(Request::builder().uri(Uri::from_static("/?v=10")).finish())
         .await;
+    println!("{}", resp.take_body().into_string().await.unwrap());
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
@@ -50,12 +80,20 @@ async fn query_default() {
         }
     }
 
-    let meta: MetaAPI = Api::metadata().remove(0);
+    let meta: MetaAPI = Api::meta().remove(0);
     assert_eq!(
         meta.paths[0].operations[0].params[0].in_type,
         MetaParamIn::Query
     );
     assert_eq!(meta.paths[0].operations[0].params[0].name, "v");
+    assert_eq!(
+        meta.paths[0].operations[0].params[0].schema,
+        MetaSchemaRef::Inline(MetaSchema {
+            format: Some("int32"),
+            default: Some(json!(999)),
+            ..i32::schema_ref().unwrap_inline().clone()
+        })
+    );
 
     let api = OpenAPI::new(Api).into_endpoint();
     let resp = api.call(Request::default()).await;
@@ -173,11 +211,35 @@ async fn deprecated() {
         }
     }
 
-    let meta: MetaAPI = Api::metadata().remove(0);
+    let meta: MetaAPI = Api::meta().remove(0);
 
     assert_eq!(meta.paths[0].path, "/a");
     assert!(meta.paths[0].operations[0].params[0].deprecated);
 
     assert_eq!(meta.paths[1].path, "/b");
     assert!(!meta.paths[1].operations[0].params[0].deprecated);
+}
+
+#[tokio::test]
+async fn desc() {
+    struct Api;
+
+    #[API]
+    impl Api {
+        #[oai(path = "/", method = "get")]
+        async fn test(&self, #[oai(name = "v", in = "query", desc = "ABC")] _v: i32) {
+            todo!()
+        }
+    }
+
+    let meta: MetaAPI = Api::meta().remove(0);
+    assert_eq!(
+        meta.paths[0].operations[0].params[0].in_type,
+        MetaParamIn::Query
+    );
+    assert_eq!(meta.paths[0].operations[0].params[0].name, "v");
+    assert_eq!(
+        meta.paths[0].operations[0].params[0].description,
+        Some("ABC")
+    );
 }

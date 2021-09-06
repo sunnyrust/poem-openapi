@@ -1,49 +1,47 @@
 mod ser;
 
-use indexmap::{IndexMap, IndexSet};
+use std::collections::HashMap;
+
 use poem::http::Method;
 pub(crate) use ser::Document;
-use serde::Serialize;
+use serde::{ser::SerializeMap, Serialize, Serializer};
+use serde_json::Value;
 
-use crate::{
-    base::Schema,
-    serde::{ser::SerializeMap, Serializer},
-    serde_json::Value,
-    types::DataType,
-};
+use crate::types::TypeName;
 
-#[derive(Debug, Default, PartialEq, Serialize)]
-pub struct MetaSchema {
-    #[serde(flatten)]
-    pub data_type: DataType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<&'static str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<&'static str>,
-    #[serde(skip_serializing_if = "IndexSet::is_empty")]
-    pub required: IndexSet<&'static str>,
-    #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub properties: IndexMap<&'static str, MetaProperty>,
-    pub deprecated: bool,
+#[inline]
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
-#[derive(Debug, PartialEq, Serialize)]
-pub struct MetaProperty {
-    #[serde(flatten)]
-    pub data_type: DataType,
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaSchema {
+    #[serde(rename = "type")]
+    pub ty: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<&'static str>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<Value>,
-    #[serde(flatten)]
-    pub validators: MetaValidators,
-}
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub required: Vec<&'static str>,
+    #[serde(
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_properties"
+    )]
+    pub properties: Vec<(&'static str, MetaSchemaRef)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub items: Option<Box<MetaSchemaRef>>,
+    #[serde(rename = "enum", skip_serializing_if = "Vec::is_empty")]
+    pub enum_items: Vec<Value>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub deprecated: bool,
 
-#[derive(Debug, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MetaValidators {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub multiple_of: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -66,6 +64,80 @@ pub struct MetaValidators {
     pub min_items: Option<usize>,
 }
 
+fn serialize_properties<S: Serializer>(
+    properties: &[(&'static str, MetaSchemaRef)],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let mut s = serializer.serialize_map(None)?;
+    for item in properties {
+        s.serialize_entry(item.0, &item.1)?;
+    }
+    s.end()
+}
+
+impl MetaSchema {
+    pub const fn new(ty: &'static str) -> Self {
+        Self {
+            ty,
+            format: None,
+            title: None,
+            description: None,
+            default: None,
+            required: vec![],
+            properties: vec![],
+            items: None,
+            enum_items: vec![],
+            deprecated: false,
+            multiple_of: None,
+            maximum: None,
+            exclusive_maximum: None,
+            minimum: None,
+            exclusive_minimum: None,
+            max_length: None,
+            min_length: None,
+            pattern: None,
+            max_items: None,
+            min_items: None,
+        }
+    }
+}
+
+impl From<TypeName> for MetaSchema {
+    fn from(name: TypeName) -> Self {
+        if let TypeName::Normal { ty, format } = name {
+            let mut schema = MetaSchema::new(ty);
+            schema.format = format;
+            schema
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetaSchemaRef {
+    Inline(MetaSchema),
+    Reference(&'static str),
+}
+
+impl MetaSchemaRef {
+    /// THIS FUNCTION ONLY FOR TESTS
+    pub fn unwrap_inline(&self) -> &MetaSchema {
+        match &self {
+            MetaSchemaRef::Inline(schema) => schema,
+            MetaSchemaRef::Reference(_) => panic!(),
+        }
+    }
+
+    /// THIS FUNCTION ONLY FOR TESTS
+    pub fn unwrap_reference(&self) -> &'static str {
+        match self {
+            MetaSchemaRef::Inline(_) => panic!(),
+            MetaSchemaRef::Reference(name) => name,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MetaParamIn {
@@ -75,10 +147,10 @@ pub enum MetaParamIn {
     Cookie,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaOperationParam {
     pub name: &'static str,
-    pub schema: DataType,
+    pub schema: MetaSchemaRef,
     #[serde(rename = "in")]
     pub in_type: MetaParamIn,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -87,22 +159,22 @@ pub struct MetaOperationParam {
     pub deprecated: bool,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaMediaType {
     #[serde(skip)]
     pub content_type: &'static str,
-    pub schema: &'static DataType,
+    pub schema: MetaSchemaRef,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
     #[serde(
-        skip_serializing_if = "<[_]>::is_empty",
+        skip_serializing_if = "Vec::is_empty",
         serialize_with = "serialize_content"
     )]
-    pub content: &'static [MetaMediaType],
+    pub content: Vec<MetaMediaType>,
     pub required: bool,
 }
 
@@ -117,75 +189,76 @@ fn serialize_content<S: Serializer>(
     s.end()
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct MetaResponses {
-    pub responses: &'static [MetaResponse],
+    pub responses: Vec<MetaResponse>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
     #[serde(skip)]
     pub status: Option<u16>,
     #[serde(
-        skip_serializing_if = "<[_]>::is_empty",
+        skip_serializing_if = "Vec::is_empty",
         serialize_with = "serialize_content"
     )]
-    pub content: &'static [MetaMediaType],
+    pub content: Vec<MetaMediaType>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaOperation {
     #[serde(skip)]
     pub method: Method,
-    #[serde(skip_serializing_if = "<[_]>::is_empty")]
-    pub tags: &'static [&'static str],
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
-    #[serde(rename = "parameters", skip_serializing_if = "<[_]>::is_empty")]
-    pub params: &'static [MetaOperationParam],
+    #[serde(rename = "parameters", skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<MetaOperationParam>,
     #[serde(rename = "requestBody", skip_serializing_if = "Option::is_none")]
-    pub request: Option<&'static MetaRequest>,
-    pub responses: &'static MetaResponses,
+    pub request: Option<MetaRequest>,
+    pub responses: MetaResponses,
+    #[serde(rename = "parameters", skip_serializing_if = "is_false")]
     pub deprecated: bool,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct MetaPath {
     pub path: &'static str,
-    pub operations: &'static [MetaOperation],
+    pub operations: Vec<MetaOperation>,
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct MetaInfo {
     pub title: Option<&'static str>,
     pub description: Option<&'static str>,
     pub version: Option<&'static str>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaServer {
     pub url: &'static str,
     pub description: Option<&'static str>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaTag {
     pub name: &'static str,
     pub description: Option<&'static str>,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct MetaAPI {
-    pub paths: &'static [MetaPath],
+    pub paths: Vec<MetaPath>,
 }
 
 #[derive(Default)]
 pub struct Registry {
-    pub schemas: IndexMap<&'static str, MetaSchema>,
+    pub schemas: HashMap<&'static str, MetaSchema>,
 }
 
 impl Registry {
@@ -193,16 +266,14 @@ impl Registry {
         Default::default()
     }
 
-    pub fn create_schema<T, F>(&mut self, mut f: F)
+    pub fn create_schema<F>(&mut self, name: &'static str, mut f: F)
     where
-        T: Schema,
         F: FnMut(&mut Registry) -> MetaSchema,
     {
-        let name = T::NAME;
         if !self.schemas.contains_key(name) {
             // Inserting a fake type before calling the function allows recursive types to
             // exist.
-            self.schemas.insert(name, MetaSchema::default());
+            self.schemas.insert(name, MetaSchema::new("fake"));
             let meta_schema = f(self);
             *self.schemas.get_mut(name).unwrap() = meta_schema;
         }

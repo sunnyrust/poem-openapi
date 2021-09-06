@@ -1,6 +1,6 @@
 use derive_more::Display;
 
-use crate::{registry::MetaValidators, validation::Validator};
+use crate::{registry::MetaSchema, validation::Validator};
 
 #[derive(Display)]
 #[display(fmt = "minLength({})", len)]
@@ -21,7 +21,7 @@ impl<T: AsRef<str>> Validator<T> for MinLength {
         value.as_ref().len() >= self.len
     }
 
-    fn update_meta(&self, meta: &mut MetaValidators) {
+    fn update_meta(&self, meta: &mut MetaSchema) {
         meta.min_length = Some(self.len);
     }
 }

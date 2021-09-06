@@ -33,7 +33,7 @@ impl<T: Type> ParseError<T> {
     pub fn expected_type(actual: Value) -> Self {
         Self::new(format!(
             r#"Expected input type "{}", found {}."#,
-            T::DATA_TYPE,
+            T::NAME,
             actual
         ))
     }
@@ -41,10 +41,7 @@ impl<T: Type> ParseError<T> {
     /// Type A expects an input value.
     #[must_use]
     pub fn expected_input() -> Self {
-        Self::new(format!(
-            r#"Type "{}" expects an input value."#,
-            T::DATA_TYPE
-        ))
+        Self::new(format!(r#"Type "{}" expects an input value."#, T::NAME))
     }
 
     /// This type does not support parsing from string.
@@ -59,16 +56,16 @@ impl<T: Type> ParseError<T> {
     /// you use the `?` operator.
     #[must_use]
     pub fn custom(msg: impl Display) -> Self {
-        Self::new(format!(r#"failed to parse "{}": {}"#, T::DATA_TYPE, msg))
+        Self::new(format!(r#"failed to parse "{}": {}"#, T::NAME, msg))
     }
 
     /// Propagate the error message to a different type.
     pub fn propagate<U: Type>(self) -> ParseError<U> {
-        if T::DATA_TYPE != U::DATA_TYPE {
+        if T::NAME != U::NAME {
             ParseError::new(format!(
                 r#"{} (occurred while parsing "{}")"#,
                 self.message,
-                U::DATA_TYPE
+                U::NAME
             ))
         } else {
             ParseError::new(self.message)

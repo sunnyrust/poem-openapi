@@ -1,15 +1,22 @@
 use serde_json::Value;
 
-use crate::types::{DataType, ParseError, ParseResult, Type};
+use crate::{
+    registry::MetaSchemaRef,
+    types::{ParseError, ParseResult, Type, TypeName},
+};
 
 macro_rules! impl_type_for_integers {
     ($(($ty:ty, $format:literal)),*) => {
         $(
         impl Type for $ty {
-            const DATA_TYPE: DataType = DataType::Normal {
+            const NAME: TypeName = TypeName::Normal {
                 ty: "integer",
                 format: Some($format),
             };
+
+            fn schema_ref() -> MetaSchemaRef {
+                MetaSchemaRef::Inline(Self::NAME.into())
+            }
 
             fn parse(value: Value) -> ParseResult<Self> {
                 if let Value::Number(n) = value {
@@ -47,4 +54,13 @@ macro_rules! impl_type_for_integers {
     };
 }
 
-impl_type_for_integers!((i8, "int8"), (i16, "int16"), (i32, "int32"), (i64, "int64"));
+impl_type_for_integers!(
+    (i8, "int8"),
+    (i16, "int16"),
+    (i32, "int32"),
+    (i64, "int64"),
+    (u8, "uint8"),
+    (u16, "uint16"),
+    (u32, "uint32"),
+    (u64, "uint64")
+);

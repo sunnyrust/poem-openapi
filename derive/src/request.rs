@@ -64,7 +64,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 content.push(quote! {
                     #crate_name::registry::MetaMediaType {
                         content_type: <#payload_ty as #crate_name::payload::Payload>::CONTENT_TYPE,
-                        schema: &<#payload_ty as #crate_name::payload::Payload>::DATA_TYPE,
+                        schema: <#payload_ty as #crate_name::payload::Payload>::schema_ref(),
                     }
                 });
                 schemas.push(payload_ty);
@@ -81,11 +81,13 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         quote! {
             #[#crate_name::poem::async_trait]
             impl #crate_name::Request for #ident {
-                const META: &'static #crate_name::registry::MetaRequest = &#crate_name::registry::MetaRequest {
-                    description: #description,
-                    content: &[#(#content),*],
-                    required: true,
-                };
+                fn meta() -> #crate_name::registry::MetaRequest {
+                    #crate_name::registry::MetaRequest {
+                        description: #description,
+                        content: ::std::vec![#(#content),*],
+                        required: true,
+                    }
+                }
 
                 fn register(registry: &mut #crate_name::registry::Registry) {
                     #(<#schemas as #crate_name::payload::Payload>::register(registry);)*

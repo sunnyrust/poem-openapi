@@ -10,7 +10,7 @@ enum MyEnum {
     C,
 }
 
-#[derive(::poem_openapi::Schema, Debug, Eq, PartialEq)]
+#[derive(::poem_openapi::Object, Debug, Eq, PartialEq)]
 struct CreateUser {
     user: ::std::string::String,
     password: ::std::string::String,
