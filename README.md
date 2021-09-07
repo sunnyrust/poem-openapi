@@ -1,4 +1,4 @@
-<h1 align="center"><code>Poem OpenAPI</code></h1>
+<h1 align="center">Poem OpenAPI</h1>
 
 <p align="center">Fast and Type-Safe OpenAPI implementation for Poem.</p>
 <div align="center">
@@ -31,6 +31,25 @@
   </a>
 </div>
 
+`Poem-openapi` allows you to easily implement APIs that comply with the `OpenAPIv3` specification.
+It uses procedural macros to generate a lots of boilerplate code, so that you only need to focus on the more 
+important business implementations.
+
+## Features
+
+* Fully supports async/await
+* Type safety
+* Rustfmt friendly (Procedural Macro)
+* Minimal overhead
+
+## Crate features
+
+To avoid compiling unused dependencies, Poem gates certain features, all of which are disabled by default:
+
+|Feature           |Description                     |
+|------------------|--------------------------------|
+|chrono            | Integrate with the [`chrono` crate](https://crates.io/crates/chrono).          |
+
 ## Example
 
 ```rust
@@ -54,16 +73,22 @@ async fn main() {
     poem::Server::bind("127.0.0.1:3000")
         .await
         .unwrap()
-        .run(OpenAPI::new(Api).title("?hello World"))
+        .run(OpenAPI::new(Api).title("hello World").ui_path("/ui"))
         .await
         .unwrap();
 }
 ```
 
-```
+## Run example
+
+Open `http://localhost:3000/ui` in your browser, you will see the `Swagger UI` that contains these API definitions.
+
+```shell
+> cargo run --example hello_world
+
 > curl http://localhost:3000
 hello!
 
 > curl http://localhost:3000\?name\=sunli
-hello, sunli!                      
+hello, sunli!        
 ```

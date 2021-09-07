@@ -18,7 +18,7 @@ async fn main() {
     poem::Server::bind("127.0.0.1:3000")
         .await
         .unwrap()
-        .run(OpenAPI::new(Api).title("?hello World"))
+        .run(OpenAPI::new(Api).title("hello World").ui_path("/ui"))
         .await
         .unwrap();
 }
