@@ -31,6 +31,8 @@
   </a>
 </div>
 
+***
+
 `Poem-openapi` allows you to easily implement APIs that comply with the `OpenAPIv3` specification.
 It uses procedural macros to generate a lots of boilerplate code, so that you only need to focus on the more 
 important business implementations.
