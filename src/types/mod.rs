@@ -12,7 +12,10 @@ pub use error::{ParseError, ParseResult};
 pub use password::Password;
 use serde_json::Value;
 
-use crate::registry::{MetaSchemaRef, Registry};
+use crate::{
+    poem::web::Field,
+    registry::{MetaSchemaRef, Registry},
+};
 
 /// Represents a type name.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -70,6 +73,12 @@ pub trait ParseFromJSON: Type {
 pub trait ParseFromParameter: Type {
     /// Parse from parameter.
     fn parse_from_parameter(value: Option<&str>) -> ParseResult<Self>;
+}
+
+/// Represents a type that can parsing from multipart field.
+pub trait ParseFromMultipartField: Type {
+    /// Parse from parameter.
+    fn parse_from_field(field: Option<Field>) -> ParseResult<Self>;
 }
 
 /// Represents a type that can converted to JSON.

@@ -84,7 +84,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         Data::Struct(s) => s,
         _ => {
             return Err(
-                Error::new_spanned(ident, "Schema can only be applied to an struct.").into(),
+                Error::new_spanned(ident, "Object can only be applied to an struct.").into(),
             )
         }
     };

@@ -21,13 +21,11 @@ members = [
 
 [features]
 default = []
-multipart = ["multer"]
 
 [dependencies]
 poem-openapi-derive = { path = "derive", version = "0.2.1" }
-poem = { version = "0.5.1", features = ["multipart"] }
+poem = { version = "0.5.4", features = ["multipart", "tempfile"] }
 
-tokio = { version = "1.10.1", features = ["io-util"] }
 serde_json = "1.0.66"
 base64 = "0.13.0"
 serde = { version = "1.0.129", features = ["derive"] }
@@ -37,12 +35,8 @@ derive_more = "0.99.16"
 num-traits = "0.2.14"
 regex = "1.5.4"
 
-# Non-feature optional dependencies
-multer = { version = "2.0.1", features = ["tokio"], optional = true }
-
 # Feature optional dependencies
 chrono = { version = "0.4.19", optional = true }
-tempfile = { version = "3.2.0", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.10.1", features = ["macros", "sync", "rt-multi-thread"] }

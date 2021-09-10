@@ -62,3 +62,12 @@ pub fn OpenApi(args: TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => err.write_errors().into(),
     }
 }
+
+#[proc_macro_derive(Multipart, attributes(oai))]
+pub fn derive_multipart(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as DeriveInput);
+    match multipart::generate(args) {
+        Ok(stream) => stream.into(),
+        Err(err) => err.write_errors().into(),
+    }
+}

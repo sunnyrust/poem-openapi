@@ -1,10 +1,9 @@
-use poem::{IntoResponse, Response, Result};
-use tokio::io::{AsyncRead, AsyncReadExt};
+use poem::{FromRequest, IntoResponse, Request, RequestBody, Response};
 
 use crate::{
     payload::Payload,
-    poem::Error,
     registry::{MetaSchema, MetaSchemaRef},
+    ParseRequestError,
 };
 
 /// A binary payload.
@@ -25,13 +24,21 @@ impl Payload for Binary {
         MetaSchemaRef::Inline(MetaSchema::new("binary"))
     }
 
-    async fn parse(mut reader: impl AsyncRead + Send + Unpin + 'static) -> Result<Self> {
-        let mut data = Vec::new();
-        reader
-            .read_to_end(&mut data)
-            .await
-            .map_err(Error::bad_request)?;
-        Ok(Self(data))
+    async fn from_request(
+        request: &Request,
+        body: &mut RequestBody,
+    ) -> Result<Self, ParseRequestError> {
+        if body.is_some() {
+            Ok(Self(<Vec<u8>>::from_request(request, body).await.map_err(
+                |err| ParseRequestError::ParseRequestBody {
+                    reason: err.to_string(),
+                },
+            )?))
+        } else {
+            Err(ParseRequestError::ParseRequestBody {
+                reason: "expect request body".to_string(),
+            })
+        }
     }
 }
 

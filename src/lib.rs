@@ -21,9 +21,6 @@ pub mod validation;
 
 pub use base::{CombinedAPI, OpenApi, Request, Response};
 pub use error::ParseRequestError;
-#[doc(hidden)]
-#[cfg(feature = "multipart")]
-pub use multer;
 pub use openapi::OpenApiService;
 #[doc(hidden)]
 pub use poem;
@@ -174,6 +171,9 @@ pub use poem_openapi_derive::Response;
 /// ```
 #[rustfmt::skip]
 pub use poem_openapi_derive::Object;
+
+#[rustfmt::skip]
+pub use poem_openapi_derive::Multipart;
 
 /// Define a OpenAPI.
 ///

@@ -1,6 +1,5 @@
-use poem::{Error, IntoResponse, Response, Result};
+use poem::{FromRequest, IntoResponse, Request, RequestBody, Response};
 use serde_json::Value;
-use tokio::io::{AsyncRead, AsyncReadExt};
 
 use crate::{
     payload::Payload,
@@ -26,25 +25,26 @@ impl<T: ParseFromJSON> Payload for Json<T> {
         T::register(registry)
     }
 
-    async fn parse(mut reader: impl AsyncRead + Send + Unpin + 'static) -> Result<Self> {
-        let mut data = Vec::new();
-        reader
-            .read_to_end(&mut data)
-            .await
-            .map_err(Error::bad_request)?;
-        let value = serde_json::from_slice::<Value>(&data).map_err(|err| {
-            Error::bad_request(ParseRequestError::ParseRequestBody {
-                type_name: T::NAME,
-                reason: err.to_string(),
+    async fn from_request(
+        request: &Request,
+        body: &mut RequestBody,
+    ) -> Result<Self, ParseRequestError> {
+        if body.is_some() {
+            let value = poem::web::Json::<Value>::from_request(request, body)
+                .await
+                .map_err(|err| ParseRequestError::ParseRequestBody {
+                    reason: err.to_string(),
+                })?;
+            let value =
+                T::parse_from_json(value.0).map_err(|err| ParseRequestError::ParseRequestBody {
+                    reason: err.into_message(),
+                })?;
+            Ok(Self(value))
+        } else {
+            Err(ParseRequestError::ParseRequestBody {
+                reason: "expect request body".to_string(),
             })
-        })?;
-        let value = T::parse_from_json(value).map_err(|err| {
-            Error::bad_request(ParseRequestError::ParseRequestBody {
-                type_name: T::NAME,
-                reason: err.into_message(),
-            })
-        })?;
-        Ok(Self(value))
+        }
     }
 }
 

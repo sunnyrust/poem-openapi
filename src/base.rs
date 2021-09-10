@@ -38,7 +38,9 @@ impl<T: Payload> Request for T {
     }
 
     async fn from_request(request: &poem::Request, body: &mut RequestBody) -> Result<Self> {
-        T::from_request(request, body).await
+        T::from_request(request, body)
+            .await
+            .map_err(Error::bad_request)
     }
 }
 
