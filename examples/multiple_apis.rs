@@ -1,3 +1,4 @@
+use poem::listener::TcpListener;
 use poem_openapi::{OpenAPI, API};
 
 struct Api1;
@@ -32,7 +33,9 @@ impl Api3 {
 
 #[tokio::main]
 async fn main() {
-    poem::Server::bind("127.0.0.1:3000")
+    let listener = TcpListener::bind("127.0.0.1:3000");
+
+    poem::Server::new(listener)
         .await
         .unwrap()
         .run(

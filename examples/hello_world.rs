@@ -1,3 +1,4 @@
+use poem::listener::TcpListener;
 use poem_openapi::{payload::PlainText, OpenAPI, API};
 
 struct Api;
@@ -15,7 +16,8 @@ impl Api {
 
 #[tokio::main]
 async fn main() {
-    poem::Server::bind("127.0.0.1:3000")
+    let listener = TcpListener::bind("127.0.0.1:3000");
+    poem::Server::new(listener)
         .await
         .unwrap()
         .run(OpenAPI::new(Api).title("hello World").ui_path("/ui"))

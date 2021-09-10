@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use poem::listener::TcpListener;
 use poem_openapi::{payload::Json, types::Password, Object, OpenAPI, Response, API};
 use tokio::sync::Mutex;
 
@@ -135,7 +136,8 @@ impl Api {
 
 #[tokio::main]
 async fn main() {
-    poem::Server::bind("127.0.0.1:3000")
+    let listener = TcpListener::bind("127.0.0.1:3000");
+    poem::Server::new(listener)
         .await
         .unwrap()
         .run(
