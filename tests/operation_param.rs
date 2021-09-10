@@ -4,9 +4,9 @@ use poem::{
     Endpoint, IntoEndpoint, Request,
 };
 use poem_openapi::{
-    registry::{MetaAPI, MetaParamIn, MetaSchema, MetaSchemaRef},
+    registry::{MetaApi, MetaParamIn, MetaSchema, MetaSchemaRef},
     types::Type,
-    OpenAPI, API,
+    OpenApi, OpenApiService,
 };
 use serde_json::json;
 
@@ -16,20 +16,20 @@ fn default_i32() -> i32 {
 
 #[tokio::test]
 async fn param_name() {
-    struct API;
+    struct Api;
 
-    #[API]
-    impl API {
+    #[OpenApi]
+    impl Api {
         #[oai(path = "/abc", method = "get")]
         async fn test(&self, #[oai(name = "a", in = "query")] a: i32) {
             assert_eq!(a, 10);
         }
     }
 
-    let meta: MetaAPI = API::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert_eq!(meta.paths[0].operations[0].params[0].name, "a");
 
-    let ep = OpenAPI::new(API).into_endpoint();
+    let ep = OpenApiService::new(Api).into_endpoint();
     let resp = ep
         .call(
             Request::builder()
@@ -45,7 +45,7 @@ async fn param_name() {
 async fn query() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "query")] v: i32) {
@@ -53,14 +53,14 @@ async fn query() {
         }
     }
 
-    let meta: MetaAPI = Api::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert_eq!(
         meta.paths[0].operations[0].params[0].in_type,
         MetaParamIn::Query
     );
     assert_eq!(meta.paths[0].operations[0].params[0].name, "v");
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let mut resp = api
         .call(Request::builder().uri(Uri::from_static("/?v=10")).finish())
         .await;
@@ -72,7 +72,7 @@ async fn query() {
 async fn query_default() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "query", default = "default_i32")] v: i32) {
@@ -80,7 +80,7 @@ async fn query_default() {
         }
     }
 
-    let meta: MetaAPI = Api::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert_eq!(
         meta.paths[0].operations[0].params[0].in_type,
         MetaParamIn::Query
@@ -95,7 +95,7 @@ async fn query_default() {
         })
     );
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let resp = api.call(Request::default()).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
@@ -104,7 +104,7 @@ async fn query_default() {
 async fn header() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "header")] v: i32) {
@@ -112,7 +112,7 @@ async fn header() {
         }
     }
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let resp = api.call(Request::builder().header("v", 10).finish()).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
@@ -121,7 +121,7 @@ async fn header() {
 async fn header_default() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "header", default = "default_i32")] v: i32) {
@@ -129,7 +129,7 @@ async fn header_default() {
         }
     }
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let resp = api.call(Request::default()).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
@@ -138,7 +138,7 @@ async fn header_default() {
 async fn path() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/k/:v", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "path")] v: i32) {
@@ -146,7 +146,7 @@ async fn path() {
         }
     }
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let resp = api
         .call(Request::builder().uri(Uri::from_static("/k/10")).finish())
         .await;
@@ -157,7 +157,7 @@ async fn path() {
 async fn cookie() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "cookie")] v: i32) {
@@ -165,7 +165,7 @@ async fn cookie() {
         }
     }
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let cookie = Cookie::new("v", "10");
     let resp = api
         .call(
@@ -181,7 +181,7 @@ async fn cookie() {
 async fn cookie_default() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "cookie", default = "default_i32")] v: i32) {
@@ -189,7 +189,7 @@ async fn cookie_default() {
         }
     }
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let resp = api.call(Request::builder().finish()).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
@@ -198,7 +198,7 @@ async fn cookie_default() {
 async fn deprecated() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/a", method = "get")]
         async fn a(&self, #[oai(name = "v", in = "query", deprecated)] _v: i32) {
@@ -211,7 +211,7 @@ async fn deprecated() {
         }
     }
 
-    let meta: MetaAPI = Api::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
 
     assert_eq!(meta.paths[0].path, "/a");
     assert!(meta.paths[0].operations[0].params[0].deprecated);
@@ -224,7 +224,7 @@ async fn deprecated() {
 async fn desc() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "v", in = "query", desc = "ABC")] _v: i32) {
@@ -232,7 +232,7 @@ async fn desc() {
         }
     }
 
-    let meta: MetaAPI = Api::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert_eq!(
         meta.paths[0].operations[0].params[0].in_type,
         MetaParamIn::Query

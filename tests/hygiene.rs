@@ -52,7 +52,7 @@ struct Api {
     >,
 }
 
-#[::poem_openapi::API]
+#[::poem_openapi::OpenApi]
 impl Api {
     /// Create a new user
     ///

@@ -95,34 +95,31 @@ pub(crate) fn convert_oai_path(
     path: &SpannedValue<String>,
 ) -> Result<(String, String, HashSet<&str>)> {
     if !path.starts_with('/') {
-        return Err(Error::new(path.span(), "The path must start with '/'.").into());
+        return Err(Error::new(path.span(), "The path must start with '/'."));
     }
 
     let mut vars = HashSet::new();
     let mut oai_path = String::new();
     let mut new_path = String::new();
 
-    for s in path.split("/") {
+    for s in path.split('/') {
         if s.is_empty() {
             continue;
         }
 
-        if s.starts_with(':') {
-            let var = &s[1..];
-
+        if let Some(var) = s.strip_prefix(':') {
             oai_path.push_str("/{");
-            oai_path.push_str(&var);
+            oai_path.push_str(var);
             oai_path.push('}');
 
             new_path.push_str("/:");
-            new_path.push_str(&var);
+            new_path.push_str(var);
 
             if !vars.insert(var) {
                 return Err(Error::new(
                     path.span(),
                     format!("Repeated path variable `{}`.", &s[1..]),
-                )
-                .into());
+                ));
             }
         } else {
             oai_path.push('/');

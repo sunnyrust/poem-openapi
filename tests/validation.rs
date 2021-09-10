@@ -2,7 +2,7 @@ use poem::{
     http::{StatusCode, Uri},
     Endpoint, IntoEndpoint, Request,
 };
-use poem_openapi::{registry::MetaAPI, types::Type, Object, OpenAPI, API};
+use poem_openapi::{registry::MetaApi, types::ParseFromJSON, Object, OpenApi, OpenApiService};
 use serde_json::json;
 
 #[test]
@@ -13,9 +13,11 @@ fn test_multiple_of() {
         n: i32,
     }
 
-    assert_eq!(A::parse(json!({ "n": 20 })).unwrap(), A { n: 20 });
+    assert_eq!(A::parse_from_json(json!({ "n": 20 })).unwrap(), A { n: 20 });
     assert_eq!(
-        A::parse(json!({ "n": 25 })).unwrap_err().into_message(),
+        A::parse_from_json(json!({ "n": 25 }))
+            .unwrap_err()
+            .into_message(),
         "failed to parse \"A\": field `n` verification failed. multipleOf(10)"
     );
 }
@@ -28,10 +30,18 @@ fn test_maximum() {
         n: i32,
     }
 
-    assert_eq!(A::parse(json!({ "n": 400 })).unwrap(), A { n: 400 });
-    assert_eq!(A::parse(json!({ "n": 500 })).unwrap(), A { n: 500 });
     assert_eq!(
-        A::parse(json!({ "n": 530 })).unwrap_err().into_message(),
+        A::parse_from_json(json!({ "n": 400 })).unwrap(),
+        A { n: 400 }
+    );
+    assert_eq!(
+        A::parse_from_json(json!({ "n": 500 })).unwrap(),
+        A { n: 500 }
+    );
+    assert_eq!(
+        A::parse_from_json(json!({ "n": 530 }))
+            .unwrap_err()
+            .into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: false)"
     );
 }
@@ -44,13 +54,20 @@ fn test_maximum_exclusive() {
         n: i32,
     }
 
-    assert_eq!(A::parse(json!({ "n": 400 })).unwrap(), A { n: 400 });
     assert_eq!(
-        A::parse(json!({ "n": 500 })).unwrap_err().into_message(),
+        A::parse_from_json(json!({ "n": 400 })).unwrap(),
+        A { n: 400 }
+    );
+    assert_eq!(
+        A::parse_from_json(json!({ "n": 500 }))
+            .unwrap_err()
+            .into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: true)"
     );
     assert_eq!(
-        A::parse(json!({ "n": 530 })).unwrap_err().into_message(),
+        A::parse_from_json(json!({ "n": 530 }))
+            .unwrap_err()
+            .into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: true)"
     );
 }
@@ -64,13 +81,13 @@ fn test_max_length() {
     }
 
     assert_eq!(
-        A::parse(json!({ "value": "abcd" })).unwrap(),
+        A::parse_from_json(json!({ "value": "abcd" })).unwrap(),
         A {
             value: "abcd".to_string()
         }
     );
     assert_eq!(
-        A::parse(json!({ "value": "abcdef" }))
+        A::parse_from_json(json!({ "value": "abcdef" }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `value` verification failed. maxLength(5)"
@@ -86,13 +103,13 @@ fn test_min_length() {
     }
 
     assert_eq!(
-        A::parse(json!({ "value": "abcdef" })).unwrap(),
+        A::parse_from_json(json!({ "value": "abcdef" })).unwrap(),
         A {
             value: "abcdef".to_string()
         }
     );
     assert_eq!(
-        A::parse(json!({ "value": "abcd" }))
+        A::parse_from_json(json!({ "value": "abcd" }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `value` verification failed. minLength(5)"
@@ -108,13 +125,13 @@ fn test_pattern() {
     }
 
     assert_eq!(
-        A::parse(json!({ "value": "[123]" })).unwrap(),
+        A::parse_from_json(json!({ "value": "[123]" })).unwrap(),
         A {
             value: "[123]".to_string()
         }
     );
     assert_eq!(
-        A::parse(json!({ "value": "123" }))
+        A::parse_from_json(json!({ "value": "123" }))
             .unwrap_err()
             .into_message(),
         r#"failed to parse "A": field `value` verification failed. pattern("\[.*\]")"#
@@ -130,13 +147,13 @@ fn test_max_items() {
     }
 
     assert_eq!(
-        A::parse(json!({ "values": ["1", "2", "3"] })).unwrap(),
+        A::parse_from_json(json!({ "values": ["1", "2", "3"] })).unwrap(),
         A {
             values: vec!["1".to_string(), "2".to_string(), "3".to_string()],
         }
     );
     assert_eq!(
-        A::parse(json!({ "values": ["1", "2", "3", "4"] }))
+        A::parse_from_json(json!({ "values": ["1", "2", "3", "4"] }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `values` verification failed. maxItems(3)"
@@ -152,7 +169,7 @@ fn test_min_items() {
     }
 
     assert_eq!(
-        A::parse(json!({ "values": ["1", "2", "3", "4"] })).unwrap(),
+        A::parse_from_json(json!({ "values": ["1", "2", "3", "4"] })).unwrap(),
         A {
             values: vec![
                 "1".to_string(),
@@ -163,7 +180,7 @@ fn test_min_items() {
         }
     );
     assert_eq!(
-        A::parse(json!({ "values": ["1", "2", "3"] }))
+        A::parse_from_json(json!({ "values": ["1", "2", "3"] }))
             .unwrap_err()
             .into_message(),
         "failed to parse \"A\": field `values` verification failed. minItems(4)"
@@ -174,7 +191,7 @@ fn test_min_items() {
 async fn param_validator() {
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(
@@ -184,7 +201,7 @@ async fn param_validator() {
         }
     }
 
-    let api = OpenAPI::new(Api).into_endpoint();
+    let api = OpenApiService::new(Api).into_endpoint();
     let mut resp = api
         .call(Request::builder().uri(Uri::from_static("/?v=999")).finish())
         .await;
@@ -194,7 +211,7 @@ async fn param_validator() {
         "failed to parse param `v`: verification failed. maximum(100, exclusive: true)"
     );
 
-    let meta: MetaAPI = Api::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert_eq!(
         meta.paths[0].operations[0].params[0]
             .schema

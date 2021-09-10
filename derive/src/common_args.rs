@@ -89,29 +89,29 @@ impl FromMeta for PathList {
 #[derive(Debug, Copy, Clone, FromMeta)]
 #[darling(rename_all = "lowercase")]
 pub(crate) enum APIMethod {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    HEAD,
-    OPTIONS,
-    CONNECT,
-    PATCH,
-    TRACE,
+    Get,
+    Post,
+    Put,
+    Delete,
+    Head,
+    Options,
+    Connect,
+    Patch,
+    Trace,
 }
 
 impl APIMethod {
-    pub(crate) fn to_http_method(&self) -> TokenStream {
+    pub(crate) fn to_http_method(self) -> TokenStream {
         match self {
-            APIMethod::GET => quote!(GET),
-            APIMethod::POST => quote!(POST),
-            APIMethod::PUT => quote!(PUT),
-            APIMethod::DELETE => quote!(DELETE),
-            APIMethod::HEAD => quote!(HEAD),
-            APIMethod::OPTIONS => quote!(OPTIONS),
-            APIMethod::CONNECT => quote!(CONNECT),
-            APIMethod::PATCH => quote!(PATCH),
-            APIMethod::TRACE => quote!(TRACE),
+            APIMethod::Get => quote!(GET),
+            APIMethod::Post => quote!(POST),
+            APIMethod::Put => quote!(PUT),
+            APIMethod::Delete => quote!(DELETE),
+            APIMethod::Head => quote!(HEAD),
+            APIMethod::Options => quote!(OPTIONS),
+            APIMethod::Connect => quote!(CONNECT),
+            APIMethod::Patch => quote!(PATCH),
+            APIMethod::Trace => quote!(TRACE),
         }
     }
 }
@@ -129,7 +129,7 @@ pub(crate) enum ParamIn {
 }
 
 impl ParamIn {
-    pub(crate) fn to_meta(&self) -> TokenStream {
+    pub(crate) fn to_meta(self) -> TokenStream {
         match self {
             ParamIn::Path => quote!(Path),
             ParamIn::Query => quote!(Query),

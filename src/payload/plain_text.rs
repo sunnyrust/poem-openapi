@@ -1,10 +1,8 @@
-use poem::{IntoResponse, Request, Response, Result};
+use poem::{IntoResponse, Response, Result};
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 use crate::{
-    payload::Payload,
-    poem::{FromRequest, RequestBody},
-    registry::MetaSchemaRef,
-    types::Type,
+    payload::Payload, poem::Error, registry::MetaSchemaRef, types::Type, ParseRequestError,
 };
 
 /// A UTF8 string payload.
@@ -25,8 +23,19 @@ impl Payload for PlainText {
         String::schema_ref()
     }
 
-    async fn from_request(request: &Request, body: &mut RequestBody) -> Result<Self> {
-        Ok(Self(String::from_request(request, body).await?))
+    async fn parse(mut reader: impl AsyncRead + Send + Unpin + 'static) -> Result<Self> {
+        let mut data = Vec::new();
+        reader
+            .read_to_end(&mut data)
+            .await
+            .map_err(Error::bad_request)?;
+        let value = String::from_utf8(data).map_err(|err| {
+            Error::bad_request(ParseRequestError::ParseRequestBody {
+                type_name: String::NAME,
+                reason: err.to_string(),
+            })
+        })?;
+        Ok(Self(value))
     }
 }
 

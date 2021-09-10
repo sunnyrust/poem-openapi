@@ -78,7 +78,7 @@ pub(crate) fn generate(
 ) -> GeneratorResult<TokenStream> {
     let APIArgs { internal } = match APIArgs::from_list(&args) {
         Ok(args) => args,
-        Err(err) => return Ok(err.write_errors().into()),
+        Err(err) => return Ok(err.write_errors()),
     };
     let crate_name = get_crate_name(internal);
     let ident = item_impl.self_ty.clone();
@@ -154,9 +154,9 @@ pub(crate) fn generate(
     let expanded = quote! {
         #item_impl
 
-        impl #crate_name::API for #ident {
-            fn meta() -> ::std::vec::Vec<#crate_name::registry::MetaAPI> {
-                ::std::vec![#crate_name::registry::MetaAPI {
+        impl #crate_name::OpenApi for #ident {
+            fn meta() -> ::std::vec::Vec<#crate_name::registry::MetaApi> {
+                ::std::vec![#crate_name::registry::MetaApi {
                     paths: ::std::vec![#(#paths),*],
                 }]
             }
@@ -172,7 +172,7 @@ pub(crate) fn generate(
         }
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }
 
 fn generate_operation(
@@ -282,17 +282,15 @@ fn generate_operation(
                         .into()),
                     };
 
-                if param_in == ParamIn::Path {
-                    if !path_vars.contains(&*param_oai_typename) {
-                        return Err(Error::new_spanned(
-                            arg,
-                            format!(
-                                "The parameter `{}` is not defined in the path.",
-                                param_oai_typename
-                            ),
-                        )
-                        .into());
-                    }
+                if param_in == ParamIn::Path && !path_vars.contains(&*param_oai_typename) {
+                    return Err(Error::new_spanned(
+                        arg,
+                        format!(
+                            "The parameter `{}` is not defined in the path.",
+                            param_oai_typename
+                        ),
+                    )
+                    .into());
                 }
 
                 let meta_in = {
@@ -301,10 +299,10 @@ fn generate_operation(
                 };
                 let validators_checker = operation_param
                     .validators()
-                    .create_param_checker(&crate_name, &param_oai_typename)?;
+                    .create_param_checker(crate_name, &param_oai_typename)?;
                 let validators_update_meta = operation_param
                     .validators()
-                    .create_update_meta(&crate_name, &arg_ty)?;
+                    .create_update_meta(crate_name, arg_ty)?;
 
                 match &operation_param.default {
                     Some(default_value) => {
@@ -321,7 +319,7 @@ fn generate_operation(
                                 let value = value.as_deref();
                                 match value {
                                     Some(value) => {
-                                        match #crate_name::types::Type::parse_from_str(Some(value))
+                                        match #crate_name::types::ParseFromParameter::parse_from_parameter(Some(value))
                                                 .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
                                                     name: #param_oai_typename,
                                                     reason: err.into_message(),
@@ -346,7 +344,7 @@ fn generate_operation(
                         parse_args.push(quote! {
                             let #pname = {
                                 let value = #crate_name::param::get(#param_oai_typename, #meta_in, &request, &query.0);
-                                match #crate_name::types::Type::parse_from_str(value.as_deref())
+                                match #crate_name::types::ParseFromParameter::parse_from_parameter(value.as_deref())
                                         .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
                                             name: #param_oai_typename,
                                             reason: err.into_message(),
@@ -368,10 +366,10 @@ fn generate_operation(
 
                 let meta_arg_default = match &operation_param.default {
                     Some(DefaultValue::Default) => quote! {
-                        ::std::option::Option::Some(<#arg_ty as ::std::default::Default>::default().to_value())
+                        ::std::option::Option::Some(#crate_name::types::ToJSON::to_json(&<#arg_ty as ::std::default::Default>::default()))
                     },
                     Some(DefaultValue::Function(func_name)) => quote! {
-                        ::std::option::Option::Some(#func_name().to_value())
+                        ::std::option::Option::Some(#crate_name::types::ToJSON::to_json(&#func_name()))
                     },
                     None => quote!(::std::option::Option::None),
                 };

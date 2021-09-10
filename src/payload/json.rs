@@ -1,11 +1,11 @@
-use poem::{Error, IntoResponse, Request, Response, Result};
+use poem::{Error, IntoResponse, Response, Result};
 use serde_json::Value;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 use crate::{
     payload::Payload,
-    poem::{FromRequest, RequestBody},
     registry::{MetaSchemaRef, Registry},
-    types::Type,
+    types::{ParseFromJSON, ToJSON},
     ParseRequestError,
 };
 
@@ -14,7 +14,7 @@ use crate::{
 pub struct Json<T>(pub T);
 
 #[poem::async_trait]
-impl<T: Type> Payload for Json<T> {
+impl<T: ParseFromJSON> Payload for Json<T> {
     const CONTENT_TYPE: &'static str = "application/json";
 
     fn schema_ref() -> MetaSchemaRef {
@@ -26,11 +26,19 @@ impl<T: Type> Payload for Json<T> {
         T::register(registry)
     }
 
-    async fn from_request(request: &Request, body: &mut RequestBody) -> Result<Self> {
-        let value = poem::web::Json::<Value>::from_request(request, body)
+    async fn parse(mut reader: impl AsyncRead + Send + Unpin + 'static) -> Result<Self> {
+        let mut data = Vec::new();
+        reader
+            .read_to_end(&mut data)
             .await
             .map_err(Error::bad_request)?;
-        let value = T::parse(value.0).map_err(|err| {
+        let value = serde_json::from_slice::<Value>(&data).map_err(|err| {
+            Error::bad_request(ParseRequestError::ParseRequestBody {
+                type_name: T::NAME,
+                reason: err.to_string(),
+            })
+        })?;
+        let value = T::parse_from_json(value).map_err(|err| {
             Error::bad_request(ParseRequestError::ParseRequestBody {
                 type_name: T::NAME,
                 reason: err.into_message(),
@@ -40,8 +48,8 @@ impl<T: Type> Payload for Json<T> {
     }
 }
 
-impl<T: Type> IntoResponse for Json<T> {
+impl<T: ToJSON> IntoResponse for Json<T> {
     fn into_response(self) -> Response {
-        poem::web::Json(self.0.to_value()).into_response()
+        poem::web::Json(self.0.to_json()).into_response()
     }
 }

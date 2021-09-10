@@ -143,7 +143,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                         match obj.get(#field_name).cloned().unwrap_or_default() {
                             #crate_name::serde_json::Value::Null => #default_value,
                             value => {
-                                let value = #crate_name::types::Type::parse(value).map_err(#crate_name::types::ParseError::propagate)?;
+                                let value = #crate_name::types::ParseFromJSON::parse_from_json(value).map_err(#crate_name::types::ParseError::propagate)?;
                                 #validators_checker
                                 value
                             }
@@ -155,7 +155,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 deserialize_fields.push(quote! {
                     #[allow(non_snake_case)]
                     let #field_ident: #field_ty = {
-                        let value = #crate_name::types::Type::parse(obj.get(#field_name).cloned().unwrap_or_default())
+                        let value = #crate_name::types::ParseFromJSON::parse_from_json(obj.get(#field_name).cloned().unwrap_or_default())
                             .map_err(#crate_name::types::ParseError::propagate)?;
                         #validators_checker
                         value
@@ -165,16 +165,16 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         };
 
         serialize_fields.push(quote! {
-            let value = #crate_name::types::Type::to_value(&self.#field_ident);
+            let value = #crate_name::types::ToJSON::to_json(&self.#field_ident);
             object.insert(::std::string::ToString::to_string(#field_name), value);
         });
 
         let field_meta_default = match &field.default {
             Some(DefaultValue::Default) => {
-                quote!(::std::option::Option::Some(#crate_name::types::Type::to_value(&<#field_ty as ::std::default::Default>::default())))
+                quote!(::std::option::Option::Some(#crate_name::types::ToJSON::to_json(&<#field_ty as ::std::default::Default>::default())))
             }
             Some(DefaultValue::Function(func_name)) => {
-                quote!(::std::option::Option::Some(#crate_name::types::Type::to_value(&#func_name())))
+                quote!(::std::option::Option::Some(#crate_name::types::ToJSON::to_json(&#func_name())))
             }
             None => quote!(::std::option::Option::None),
         };
@@ -210,11 +210,11 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
     let meta_object_default = match &args.default {
         Some(DefaultValue::Default) => {
             quote!(::std::option::Option::Some(
-                #crate_name::types::Type::to_value(&<Self as ::std::default::Default>::default())
+                #crate_name::types::ToJSON::to_json(&<Self as ::std::default::Default>::default())
             ))
         }
         Some(DefaultValue::Function(func_name)) => {
-            quote!(::std::option::Option::Some(#crate_name::types::Type::to_value(&#func_name())))
+            quote!(::std::option::Option::Some(#crate_name::types::ToJSON::to_json(&#func_name())))
         }
         None => quote!(::std::option::Option::None),
     };
@@ -272,8 +272,10 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 fn register(registry: &mut #crate_name::registry::Registry) {
                     registry.create_schema(#oai_typename, |registry| #meta);
                 }
+            }
 
-                fn parse(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
+            impl #crate_name::types::ParseFromJSON for #ident {
+                fn parse_from_json(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
                     match value {
                         #crate_name::serde_json::Value::Object(obj) => {
                             #(#deserialize_fields)*
@@ -283,12 +285,10 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                         _ => ::std::result::Result::Err(#crate_name::types::ParseError::expected_type(value)),
                     }
                 }
+            }
 
-                fn parse_from_str(_value: ::std::option::Option<&str>) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
-                    ::std::result::Result::Err(#crate_name::types::ParseError::not_support_parsing_from_string())
-                }
-
-                fn to_value(&self) -> #crate_name::serde_json::Value {
+            impl #crate_name::types::ToJSON for #ident {
+                fn to_json(&self) -> #crate_name::serde_json::Value {
                     let mut object = ::serde_json::Map::new();
                     #(#serialize_fields)*
                     #crate_name::serde_json::Value::Object(object)
@@ -297,14 +297,14 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
 
             impl #crate_name::serde::Serialize for #ident {
                 fn serialize<S: #crate_name::serde::Serializer>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error> {
-                    #crate_name::types::Type::to_value(self).serialize(serializer)
+                    #crate_name::types::ToJSON::to_json(self).serialize(serializer)
                 }
             }
 
             impl<'de> #crate_name::serde::Deserialize<'de> for #ident {
                 fn deserialize<D: #crate_name::serde::Deserializer<'de>>(deserializer: D) -> ::std::result::Result<Self, D::Error> {
                     let value: #crate_name::serde_json::Value = #crate_name::serde::de::Deserialize::deserialize(deserializer)?;
-                    #crate_name::types::Type::parse(value).map_err(|err| #crate_name::serde::de::Error::custom(err.into_message()))
+                    #crate_name::types::ParseFromJSON::parse_from_json(value).map_err(|err| #crate_name::serde::de::Error::custom(err.into_message()))
                 }
             }
         }
@@ -321,7 +321,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     registry.create_schema(ref_name, |registry| #meta);
                 }
 
-                fn __internal_parse(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> where Self: #crate_name::types::Type {
+                fn __internal_parse_from_json(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> where Self: #crate_name::types::Type {
                     match value {
                         #crate_name::serde_json::Value::Object(obj) => {
                             #(#deserialize_fields)*
@@ -332,7 +332,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     }
                 }
 
-                fn __internal_to_value(&self) -> #crate_name::serde_json::Value where Self: #crate_name::types::Type {
+                fn __internal_to_json(&self) -> #crate_name::serde_json::Value where Self: #crate_name::types::Type {
                     let mut object = ::serde_json::Map::new();
                     #(#serialize_fields)*
                     #crate_name::serde_json::Value::Object(object)
@@ -360,30 +360,30 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     fn register(registry: &mut #crate_name::registry::Registry) {
                         Self::__internal_register(registry);
                     }
+                }
 
-                    fn parse(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
-                        Self::__internal_parse(value)
+                impl #crate_name::types::ParseFromJSON for #concrete_type {
+                    fn parse_from_json(value: #crate_name::serde_json::Value) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
+                        Self::__internal_parse_from_json(value)
                     }
+                }
 
-                    fn parse_from_str(_value: ::std::option::Option<&str>) -> ::std::result::Result<Self, #crate_name::types::ParseError<Self>> {
-                        ::std::result::Result::Err(#crate_name::types::ParseError::not_support_parsing_from_string())
-                    }
-
-                    fn to_value(&self) -> #crate_name::serde_json::Value {
-                        Self::__internal_to_value(self)
+                impl #crate_name::types::ToJSON for #concrete_type {
+                    fn to_json(&self) -> #crate_name::serde_json::Value {
+                        Self::__internal_to_json(self)
                     }
                 }
 
                 impl #crate_name::serde::Serialize for #concrete_type {
                     fn serialize<S: #crate_name::serde::Serializer>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error> {
-                        #crate_name::types::Type::to_value(self).serialize(serializer)
+                        #crate_name::types::ToJSON::to_json(self).serialize(serializer)
                     }
                 }
 
                 impl<'de> #crate_name::serde::Deserialize<'de> for #concrete_type {
                     fn deserialize<D: #crate_name::serde::Deserializer<'de>>(deserializer: D) -> ::std::result::Result<Self, D::Error> {
                         let value: #crate_name::serde_json::Value = #crate_name::serde::de::Deserialize::deserialize(deserializer)?;
-                        #crate_name::types::Type::parse(value).map_err(|err| #crate_name::serde::de::Error::custom(err.into_message()))
+                        #crate_name::types::ParseFromJSON::parse_from_json(value).map_err(|err| #crate_name::serde::de::Error::custom(err.into_message()))
                     }
                 }
             };
@@ -396,5 +396,5 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
     if oai_typename == "A1" {
         println!("{}", expanded);
     }
-    Ok(expanded.into())
+    Ok(expanded)
 }

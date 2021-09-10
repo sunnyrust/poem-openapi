@@ -179,13 +179,13 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         }
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }
 
 fn get_status(span: Span, status: Option<u16>) -> Result<TokenStream> {
     let status =
         status.ok_or_else(|| Error::new(span, "Response can only be applied to an enum."))?;
-    if status < 100 || status >= 1000 {
+    if !(100..1000).contains(&status) {
         return Err(Error::new(
             span,
             "Invalid status code, it must be greater or equal to 100 and less than 1000.",

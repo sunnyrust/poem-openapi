@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::{
     registry::MetaSchemaRef,
-    types::{ParseError, ParseResult, Type, TypeName},
+    types::{ParseError, ParseFromJSON, ParseFromParameter, ParseResult, ToJSON, Type, TypeName},
 };
 
 impl Type for DateTime<FixedOffset> {
@@ -15,23 +15,29 @@ impl Type for DateTime<FixedOffset> {
     fn schema_ref() -> MetaSchemaRef {
         MetaSchemaRef::Inline(Self::NAME.into())
     }
+}
 
-    fn parse(value: Value) -> ParseResult<Self> {
+impl ParseFromJSON for DateTime<FixedOffset> {
+    fn parse_from_json(value: Value) -> ParseResult<Self> {
         if let Value::String(value) = value {
             Ok(value.parse()?)
         } else {
             Err(ParseError::expected_type(value))
         }
     }
+}
 
-    fn parse_from_str(value: Option<&str>) -> ParseResult<Self> {
+impl ParseFromParameter for DateTime<FixedOffset> {
+    fn parse_from_parameter(value: Option<&str>) -> ParseResult<Self> {
         match value {
             Some(value) => Ok(value.parse()?),
             None => Err(ParseError::expected_input()),
         }
     }
+}
 
-    fn to_value(&self) -> Value {
+impl ToJSON for DateTime<FixedOffset> {
+    fn to_json(&self) -> Value {
         Value::String(self.to_rfc3339())
     }
 }

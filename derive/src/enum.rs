@@ -74,7 +74,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 .rename(variant.ident.unraw().to_string(), RenameTarget::EnumItem)
         });
 
-        enum_items.push(quote!(#crate_name::types::Type::to_value(&#ident::#item_ident)));
+        enum_items.push(quote!(#crate_name::types::ToJSON::to_json(&#ident::#item_ident)));
         ident_to_item.push(quote!(#ident::#item_ident => #oai_item_name));
         item_to_ident
             .push(quote!(#oai_item_name => ::std::result::Result::Ok(#ident::#item_ident)));
@@ -83,11 +83,11 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
     let meta_default_value = match &args.default {
         Some(DefaultValue::Default) => {
             quote!(::std::option::Option::Some(
-                #crate_name::types::Type::to_value(&<Self as ::std::default::Default>::default())
+                #crate_name::types::ToJSON::to_json(&<Self as ::std::default::Default>::default())
             ))
         }
         Some(DefaultValue::Function(func_name)) => {
-            quote!(::std::option::Option::Some(#crate_name::types::Type::to_value(&#func_name())))
+            quote!(::std::option::Option::Some(#crate_name::types::ToJSON::to_json(&#func_name())))
         }
         None => quote!(::std::option::Option::None),
     };
@@ -134,8 +134,10 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     ..#crate_name::registry::MetaSchema::new(#oai_typename)
                 });
             }
+        }
 
-            fn parse(value: #crate_name::serde_json::Value) -> #crate_name::types::ParseResult<Self> {
+        impl #crate_name::types::ParseFromJSON for #ident {
+            fn parse_from_json(value: #crate_name::serde_json::Value) -> #crate_name::types::ParseResult<Self> {
                 match &value {
                     #crate_name::serde_json::Value::String(item) => match item.as_str() {
                         #(#item_to_ident,)*
@@ -145,8 +147,10 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     _ => ::std::result::Result::Err(#crate_name::types::ParseError::expected_type(value)),
                 }
             }
+        }
 
-            fn parse_from_str(value: ::std::option::Option<&str>) -> #crate_name::types::ParseResult<Self> {
+        impl #crate_name::types::ParseFromParameter for #ident {
+            fn parse_from_parameter(value: ::std::option::Option<&str>) -> #crate_name::types::ParseResult<Self> {
                 match value {
                     ::std::option::Option::Some(value) => match value {
                         #(#item_to_ident,)*
@@ -156,8 +160,10 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     _ => ::std::result::Result::Err(#crate_name::types::ParseError::expected_input()),
                 }
             }
+        }
 
-            fn to_value(&self) -> #crate_name::serde_json::Value {
+        impl #crate_name::types::ToJSON for #ident {
+            fn to_json(&self) -> #crate_name::serde_json::Value {
                 let name = match self {
                     #(#ident_to_item),*
                 };
@@ -166,5 +172,5 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         }
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }

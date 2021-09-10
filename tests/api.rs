@@ -4,26 +4,26 @@ use poem::{
 };
 use poem_openapi::{
     payload::{Binary, Json, PlainText},
-    registry::{MetaAPI, MetaSchema},
+    registry::{MetaApi, MetaSchema},
     types::Type,
-    OpenAPI, Request, Response, API,
+    OpenApi, OpenApiService, Request, Response,
 };
 
 #[tokio::test]
 async fn path_and_method() {
-    struct API;
+    struct Api;
 
-    #[API]
-    impl API {
+    #[OpenApi]
+    impl Api {
         #[oai(path = "/abc", method = "post")]
         async fn test(&self) {}
     }
 
-    let meta: MetaAPI = API::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert_eq!(meta.paths[0].path, "/abc");
     assert_eq!(meta.paths[0].operations[0].method, Method::POST);
 
-    let ep = OpenAPI::new(API).into_endpoint();
+    let ep = OpenApiService::new(Api).into_endpoint();
     let resp = ep
         .call(
             poem::Request::builder()
@@ -37,29 +37,29 @@ async fn path_and_method() {
 
 #[test]
 fn deprecated() {
-    struct API;
+    struct Api;
 
-    #[API]
-    impl API {
+    #[OpenApi]
+    impl Api {
         #[oai(path = "/abc", method = "get", deprecated)]
         async fn test(&self) {}
     }
 
-    let meta: MetaAPI = API::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert!(meta.paths[0].operations[0].deprecated);
 }
 
 #[test]
 fn tag() {
-    struct API;
+    struct Api;
 
-    #[API]
-    impl API {
+    #[OpenApi]
+    impl Api {
         #[oai(path = "/abc", method = "get", tag = "a", tag = "b")]
         async fn test(&self) {}
     }
 
-    let meta: MetaAPI = API::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     assert_eq!(meta.paths[0].operations[0].tags, vec!["a", "b"]);
 }
 
@@ -68,32 +68,32 @@ async fn request() {
     /// Test request
     #[derive(Request)]
     enum MyRequest {
-        CreateWithJson(Json<i32>),
-        CreateWithPlainText(PlainText),
-        CreateWithBinary(Binary),
+        Json(Json<i32>),
+        PlainText(PlainText),
+        Binary(Binary),
     }
 
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, req: MyRequest) {
             match req {
-                MyRequest::CreateWithJson(value) => {
+                MyRequest::Json(value) => {
                     assert_eq!(value.0, 100);
                 }
-                MyRequest::CreateWithPlainText(value) => {
+                MyRequest::PlainText(value) => {
                     assert_eq!(value.0, "abc");
                 }
-                MyRequest::CreateWithBinary(value) => {
+                MyRequest::Binary(value) => {
                     assert_eq!(value.0, vec![1, 2, 3]);
                 }
             }
         }
     }
 
-    let meta: MetaAPI = Api::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     let meta_request = meta.paths[0].operations[0].request.as_ref().unwrap();
     assert!(meta_request.required);
     assert_eq!(meta_request.description, Some("Test request"));
@@ -113,7 +113,7 @@ async fn request() {
         &MetaSchema::new("binary")
     );
 
-    let ep = OpenAPI::new(Api).into_endpoint();
+    let ep = OpenApiService::new(Api).into_endpoint();
     let resp = ep
         .call(
             poem::Request::builder()
@@ -164,7 +164,7 @@ async fn response() {
 
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "code", in = "query")] code: u16) -> MyResponse {
@@ -179,7 +179,7 @@ async fn response() {
         }
     }
 
-    let meta: MetaAPI = Api::meta().remove(0);
+    let meta: MetaApi = Api::meta().remove(0);
     let meta_responses = &meta.paths[0].operations[0].responses;
     assert_eq!(meta_responses.responses[0].description, Some("Ok"));
     assert_eq!(meta_responses.responses[0].status, Some(200));
@@ -210,7 +210,7 @@ async fn response() {
         String::schema_ref()
     );
 
-    let ep = OpenAPI::new(Api).into_endpoint();
+    let ep = OpenApiService::new(Api).into_endpoint();
 
     let mut resp = ep
         .call(
@@ -267,7 +267,7 @@ async fn bad_request_handler() {
 
     struct Api;
 
-    #[API]
+    #[OpenApi]
     impl Api {
         #[oai(path = "/", method = "get")]
         async fn test(&self, #[oai(name = "code", in = "query")] code: u16) -> MyResponse {
@@ -275,7 +275,7 @@ async fn bad_request_handler() {
         }
     }
 
-    let ep = OpenAPI::new(Api).into_endpoint();
+    let ep = OpenApiService::new(Api).into_endpoint();
 
     let mut resp = ep
         .call(

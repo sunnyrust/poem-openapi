@@ -1,9 +1,9 @@
 use poem::listener::TcpListener;
-use poem_openapi::{payload::PlainText, OpenAPI, API};
+use poem_openapi::{payload::PlainText, OpenApi, OpenApiService};
 
 struct Api;
 
-#[API]
+#[OpenApi]
 impl Api {
     #[oai(path = "/", method = "get")]
     async fn index(&self, #[oai(name = "name", in = "query")] name: Option<String>) -> PlainText {
@@ -20,7 +20,7 @@ async fn main() {
     poem::Server::new(listener)
         .await
         .unwrap()
-        .run(OpenAPI::new(Api).title("hello World").ui_path("/ui"))
+        .run(OpenApiService::new(Api).title("hello World").ui_path("/ui"))
         .await
         .unwrap();
 }

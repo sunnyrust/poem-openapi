@@ -2,7 +2,7 @@ use poem::{route::Route, Error, IntoResponse, RequestBody, Result};
 
 use crate::{
     payload::Payload,
-    registry::{MetaAPI, MetaMediaType, MetaRequest, MetaResponse, MetaResponses, Registry},
+    registry::{MetaApi, MetaMediaType, MetaRequest, MetaResponse, MetaResponses, Registry},
 };
 
 /// Represents a OpenAPI request object.
@@ -77,7 +77,7 @@ impl Response for () {
     fn register(_registry: &mut Registry) {}
 }
 
-impl<T: Payload> Response for T {
+impl<T: Payload + IntoResponse> Response for T {
     fn meta() -> MetaResponses {
         MetaResponses {
             responses: vec![MetaResponse {
@@ -97,9 +97,9 @@ impl<T: Payload> Response for T {
 }
 
 /// Represents a OpenAPI object.
-pub trait API: Sized {
+pub trait OpenApi: Sized {
     /// Gets metadata of this API object.
-    fn meta() -> Vec<MetaAPI>;
+    fn meta() -> Vec<MetaApi>;
 
     /// Register some types to the registry.
     fn register(registry: &mut Registry);
@@ -108,7 +108,7 @@ pub trait API: Sized {
     fn add_routes(self, route: Route) -> Route;
 
     /// Combine two API objects into one.
-    fn combine<T: API>(self, other: T) -> CombinedAPI<Self, T> {
+    fn combine<T: OpenApi>(self, other: T) -> CombinedAPI<Self, T> {
         CombinedAPI(self, other)
     }
 }
@@ -116,8 +116,8 @@ pub trait API: Sized {
 /// API for the [`combine`](API::combine) method.
 pub struct CombinedAPI<A, B>(A, B);
 
-impl<A: API, B: API> API for CombinedAPI<A, B> {
-    fn meta() -> Vec<MetaAPI> {
+impl<A: OpenApi, B: OpenApi> OpenApi for CombinedAPI<A, B> {
+    fn meta() -> Vec<MetaApi> {
         let mut metadata = A::meta();
         metadata.extend(B::meta());
         metadata

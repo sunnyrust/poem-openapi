@@ -1,6 +1,6 @@
 use poem_openapi::{
     registry::{MetaSchema, Registry},
-    types::Type,
+    types::{ParseFromJSON, ToJSON, Type},
     Object,
 };
 use serde_json::json;
@@ -41,7 +41,7 @@ fn concretes() {
         concrete(name = "Obj_i32_i64", params(i32, i64)),
         concrete(name = "Obj_f32_f64", params(f32, f64))
     )]
-    struct Obj<T1: Type, T2: Type> {
+    struct Obj<T1: ParseFromJSON + ToJSON, T2: ParseFromJSON + ToJSON> {
         create_user: T1,
         delete_user: T2,
     }
@@ -95,7 +95,7 @@ fn field_skip() {
     assert_eq!(meta.properties.len(), 1);
 
     assert_eq!(
-        Obj::parse(json!({
+        Obj::parse_from_json(json!({
             "a": 10,
         }))
         .unwrap(),
@@ -103,7 +103,7 @@ fn field_skip() {
     );
 
     assert_eq!(
-        Obj { a: 10, b: 0 }.to_value(),
+        Obj { a: 10, b: 0 }.to_json(),
         json!({
             "a": 10,
         })
@@ -207,17 +207,20 @@ fn field_default() {
     assert_eq!(field_meta.default, Some(json!(100)));
 
     assert_eq!(
-        Obj::parse(json!({
+        Obj::parse_from_json(json!({
             "a": 1,
         }))
         .unwrap(),
         Obj { a: 1, b: 100 }
     );
 
-    assert_eq!(Obj::parse(json!({})).unwrap(), Obj { a: 0, b: 100 });
+    assert_eq!(
+        Obj::parse_from_json(json!({})).unwrap(),
+        Obj { a: 0, b: 100 }
+    );
 
     assert_eq!(
-        Obj::parse(json!({
+        Obj::parse_from_json(json!({
             "a": 33,
             "b":44,
         }))
@@ -237,8 +240,11 @@ fn default() {
     let meta = get_meta::<Obj>();
     assert_eq!(meta.default, Some(json!(Obj { a: 0 })));
 
-    assert_eq!(Obj::parse(json!(null)).unwrap(), Obj { a: 0 });
-    assert_eq!(Obj::parse(json!({ "a": 88 })).unwrap(), Obj { a: 88 });
+    assert_eq!(Obj::parse_from_json(json!(null)).unwrap(), Obj { a: 0 });
+    assert_eq!(
+        Obj::parse_from_json(json!({ "a": 88 })).unwrap(),
+        Obj { a: 88 }
+    );
 }
 
 #[test]
@@ -256,8 +262,11 @@ fn default_func() {
     let meta = get_meta::<Obj>();
     assert_eq!(meta.default, Some(json!(Obj { a: 88 })));
 
-    assert_eq!(Obj::parse(json!(null)).unwrap(), Obj { a: 88 });
-    assert_eq!(Obj::parse(json!({ "a": 99 })).unwrap(), Obj { a: 99 });
+    assert_eq!(Obj::parse_from_json(json!(null)).unwrap(), Obj { a: 88 });
+    assert_eq!(
+        Obj::parse_from_json(json!({ "a": 99 })).unwrap(),
+        Obj { a: 99 }
+    );
 }
 
 #[test]
@@ -281,7 +290,7 @@ fn serde() {
 fn serde_generic() {
     #[derive(Object, Debug, Eq, PartialEq)]
     #[oai(concrete(name = "Obj", params(i32)))]
-    struct Obj<T: Type> {
+    struct Obj<T: ParseFromJSON + ToJSON> {
         a: T,
     }
 

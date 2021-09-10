@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use poem::listener::TcpListener;
-use poem_openapi::{payload::Json, types::Password, Object, OpenAPI, Response, API};
+use poem_openapi::{payload::Json, types::Password, Object, OpenApi, OpenApiService, Response};
 use tokio::sync::Mutex;
 
 /// Create user schema
@@ -72,7 +72,7 @@ struct Api {
     users: Mutex<HashMap<String, User>>,
 }
 
-#[API]
+#[OpenApi]
 impl Api {
     /// Create a new user
     #[oai(path = "/users", method = "post", tag = "user")]
@@ -141,7 +141,7 @@ async fn main() {
         .await
         .unwrap()
         .run(
-            OpenAPI::new(Api::default())
+            OpenApiService::new(Api::default())
                 .title("poem-openapi")
                 .version("0.1.0")
                 .server_with_description("http://localhost:3000", "localhost")

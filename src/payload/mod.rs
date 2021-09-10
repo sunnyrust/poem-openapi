@@ -3,17 +3,22 @@
 mod binary;
 mod json;
 mod plain_text;
+#[cfg(feature = "tempfile")]
+mod tempfile;
 
 pub use binary::Binary;
 pub use json::Json;
 pub use plain_text::PlainText;
-use poem::{IntoResponse, Request, RequestBody, Result};
+use poem::Result;
+use tokio::io::AsyncRead;
 
+#[cfg(feature = "tempfile")]
+pub use self::tempfile::TempFile;
 use crate::registry::{MetaSchemaRef, Registry};
 
 /// Represents a payload type.
 #[poem::async_trait]
-pub trait Payload: IntoResponse + Sized {
+pub trait Payload: Sized {
     /// The content type of this payload.
     const CONTENT_TYPE: &'static str;
 
@@ -24,6 +29,6 @@ pub trait Payload: IntoResponse + Sized {
     #[allow(unused_variables)]
     fn register(registry: &mut Registry) {}
 
-    /// Parse the payload object from the HTTP request.
-    async fn from_request(request: &Request, body: &mut RequestBody) -> Result<Self>;
+    /// Parse the payload from the reader.
+    async fn parse(reader: impl AsyncRead + Send + Unpin + 'static) -> Result<Self>;
 }

@@ -3,11 +3,11 @@ use poem::{route, route::Route, IntoEndpoint};
 use crate::{
     registry::{Document, MetaInfo, MetaServer, MetaTag, Registry},
     ui::add_ui_routes,
-    API,
+    OpenApi,
 };
 
-/// An OpenAPI container for Poem.
-pub struct OpenAPI<T> {
+/// An OpenAPI service for Poem.
+pub struct OpenApiService<T> {
     api: T,
     info: Option<MetaInfo>,
     servers: Vec<MetaServer>,
@@ -15,7 +15,7 @@ pub struct OpenAPI<T> {
     ui_path: Option<String>,
 }
 
-impl<T> OpenAPI<T> {
+impl<T> OpenApiService<T> {
     /// Create an OpenAPI container.
     #[must_use]
     pub fn new(api: T) -> Self {
@@ -113,7 +113,7 @@ impl<T> OpenAPI<T> {
     }
 }
 
-impl<T: API> IntoEndpoint for OpenAPI<T> {
+impl<T: OpenApi> IntoEndpoint for OpenApiService<T> {
     type Endpoint = Route;
 
     fn into_endpoint(self) -> Self::Endpoint {

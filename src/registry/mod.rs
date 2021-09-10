@@ -252,7 +252,7 @@ pub struct MetaTag {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MetaAPI {
+pub struct MetaApi {
     pub paths: Vec<MetaPath>,
 }
 

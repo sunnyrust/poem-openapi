@@ -57,7 +57,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 from_requests.push(quote! {
                     ::std::option::Option::Some(<#payload_ty as #crate_name::payload::Payload>::CONTENT_TYPE) => {
                         ::std::result::Result::Ok(#ident::#item_ident(
-                            <#payload_ty as #crate_name::payload::Payload>::from_request(request, body).await?
+                            <#payload_ty as #crate_name::payload::Payload>::parse(body.take()?.into_async_read()).await?
                         ))
                     }
                 });
@@ -107,5 +107,5 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         }
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }

@@ -19,9 +19,12 @@ pub mod ui;
 #[doc(hidden)]
 pub mod validation;
 
-pub use base::{CombinedAPI, Request, Response, API};
+pub use base::{CombinedAPI, OpenApi, Request, Response};
 pub use error::ParseRequestError;
-pub use openapi::OpenAPI;
+#[doc(hidden)]
+#[cfg(feature = "multipart")]
+pub use multer;
+pub use openapi::OpenApiService;
 #[doc(hidden)]
 pub use poem;
 #[doc(hidden)]
@@ -206,7 +209,7 @@ pub use poem_openapi_derive::Object;
 /// ```
 /// use poem_openapi::{
 ///     payload::{Json, PlainText},
-///     Request, Object, API, Response,
+///     Request, Object, OpenApi, Response,
 /// };
 ///
 /// #[derive(Object)]
@@ -232,11 +235,11 @@ pub use poem_openapi_derive::Object;
 ///     #[oai(status = 409)]
 ///     PetAlreadyExists,
 /// }
-/// 
-/// struct PetAPI;
-/// 
-/// #[API]
-/// impl PetAPI {
+///
+/// struct PetApi;
+///
+/// #[OpenApi]
+/// impl PetApi {
 ///     /// Create a new pet.
 ///     #[oai(path = "/pet", method = "post")]
 ///     async fn create_pet(
@@ -249,4 +252,4 @@ pub use poem_openapi_derive::Object;
 /// }
 /// ```
 #[rustfmt::skip]
-pub use poem_openapi_derive::API;
+pub use poem_openapi_derive::OpenApi;

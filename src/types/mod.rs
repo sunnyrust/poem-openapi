@@ -57,13 +57,23 @@ pub trait Type: Sized + Send + Sync {
     /// Register this type to types registry.
     #[allow(unused_variables)]
     fn register(registry: &mut Registry) {}
+}
 
+/// Represents a type that can parsing from JSON.
+pub trait ParseFromJSON: Type {
     /// Parse from [`serde_json::Value`].
-    fn parse(value: Value) -> ParseResult<Self>;
+    fn parse_from_json(value: Value) -> ParseResult<Self>;
+}
 
-    /// Parse from string.
-    fn parse_from_str(value: Option<&str>) -> ParseResult<Self>;
+/// Represents a type that can parsing from parameter. (header, query, path,
+/// cookie)
+pub trait ParseFromParameter: Type {
+    /// Parse from parameter.
+    fn parse_from_parameter(value: Option<&str>) -> ParseResult<Self>;
+}
 
+/// Represents a type that can converted to JSON.
+pub trait ToJSON: Type {
     /// Convert this value to [`serde_json::Value`].
-    fn to_value(&self) -> Value;
+    fn to_json(&self) -> Value;
 }

@@ -1,9 +1,9 @@
 use poem::listener::TcpListener;
-use poem_openapi::{OpenAPI, API};
+use poem_openapi::{OpenApi, OpenApiService};
 
 struct Api1;
 
-#[API]
+#[OpenApi]
 impl Api1 {
     #[oai(path = "/a", method = "get")]
     async fn test(&self) {}
@@ -11,7 +11,7 @@ impl Api1 {
 
 struct Api2;
 
-#[API]
+#[OpenApi]
 impl Api2 {
     #[oai(path = "/b", method = "post")]
     async fn test1(&self) {}
@@ -22,7 +22,7 @@ impl Api2 {
 
 struct Api3;
 
-#[API]
+#[OpenApi]
 impl Api3 {
     #[oai(path = "/c", method = "post")]
     async fn test1(&self) {}
@@ -39,7 +39,7 @@ async fn main() {
         .await
         .unwrap()
         .run(
-            OpenAPI::new(Api1.combine(Api2).combine(Api3))
+            OpenApiService::new(Api1.combine(Api2).combine(Api3))
                 .title("hello World")
                 .ui_path("/"),
         )

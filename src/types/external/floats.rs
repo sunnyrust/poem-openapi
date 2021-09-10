@@ -2,7 +2,7 @@ use serde_json::{Number, Value};
 
 use crate::{
     registry::MetaSchemaRef,
-    types::{ParseError, ParseResult, Type, TypeName},
+    types::{ParseError, ParseFromJSON, ParseFromParameter, ParseResult, ToJSON, Type, TypeName},
 };
 
 macro_rules! impl_type_for_floats {
@@ -17,8 +17,10 @@ macro_rules! impl_type_for_floats {
             fn schema_ref() -> MetaSchemaRef {
                 MetaSchemaRef::Inline(Self::NAME.into())
             }
+        }
 
-            fn parse(value: Value) -> ParseResult<Self> {
+        impl ParseFromJSON for $ty {
+             fn parse_from_json(value: Value) -> ParseResult<Self> {
                 if let Value::Number(n) = value {
                     let n = n
                         .as_f64()
@@ -28,15 +30,19 @@ macro_rules! impl_type_for_floats {
                     Err(ParseError::expected_type(value))
                 }
             }
+        }
 
-            fn parse_from_str(value: Option<&str>) -> ParseResult<Self> {
+        impl ParseFromParameter for $ty {
+            fn parse_from_parameter(value: Option<&str>) -> ParseResult<Self> {
                 match value {
                     Some(value) => value.parse().map_err(ParseError::custom),
                     None => Err(ParseError::expected_input()),
                 }
             }
+        }
 
-            fn to_value(&self) -> Value {
+        impl ToJSON for $ty {
+            fn to_json(&self) -> Value {
                 Value::Number(Number::from_f64(*self as f64).unwrap())
             }
         }

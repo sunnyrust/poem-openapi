@@ -26,7 +26,7 @@ impl<'a> Validators<'a> {
 
         if let Some(value) = self.multiple_of {
             // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.1
-            if &**value <= &0.0 {
+            if **value <= 0.0 {
                 return Err(Error::new(
                     value.span(),
                     "The value of `multipleOf` MUST be a number, strictly greater than 0.",
@@ -49,26 +49,12 @@ impl<'a> Validators<'a> {
 
         if let Some(value) = self.max_length {
             // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.6
-            if &**value < &0 {
-                return Err(Error::new(
-                    value.span(),
-                    "The value of `maxLength` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
-                )
-                    .into());
-            }
             let value = &**value;
             validators.push(quote!(#crate_name::validation::MaxLength::new(#value)));
         }
 
         if let Some(value) = self.min_length {
             // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.7
-            if &**value < &0 {
-                return Err(Error::new(
-                    value.span(),
-                    "The value of `minLength` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
-                )
-                    .into());
-            }
             let value = &**value;
             validators.push(quote!(#crate_name::validation::MinLength::new(#value)));
         }
@@ -88,26 +74,12 @@ impl<'a> Validators<'a> {
 
         if let Some(value) = self.max_items {
             // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.10
-            if &**value < &0 {
-                return Err(Error::new(
-                    value.span(),
-                    "The value of `maxItems` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
-                )
-                    .into());
-            }
             let value = &**value;
             validators.push(quote!(#crate_name::validation::MaxItems::new(#value)));
         }
 
         if let Some(value) = self.min_items {
             // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.11
-            if &**value < &0 {
-                return Err(Error::new(
-                    value.span(),
-                    "The value of `minItems` MUST be an integer. This integer MUST be greater than, or equal to, 0.",
-                )
-                    .into());
-            }
             let value = &**value;
             validators.push(quote!(#crate_name::validation::MinItems::new(#value)));
         }

@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::{
     registry::MetaSchemaRef,
-    types::{ParseError, ParseResult, Type, TypeName},
+    types::{ParseError, ParseFromJSON, ParseFromParameter, ParseResult, ToJSON, Type, TypeName},
 };
 
 /// Represents a binary data encoded with base64.
@@ -18,23 +18,29 @@ impl Type for Base64 {
     fn schema_ref() -> MetaSchemaRef {
         MetaSchemaRef::Inline(Self::NAME.into())
     }
+}
 
-    fn parse(value: Value) -> ParseResult<Self> {
+impl ParseFromJSON for Base64 {
+    fn parse_from_json(value: Value) -> ParseResult<Self> {
         if let Value::String(value) = value {
             Ok(Self(base64::decode(value).map_err(Error::bad_request)?))
         } else {
             Err(ParseError::expected_type(value))
         }
     }
+}
 
-    fn parse_from_str(value: Option<&str>) -> ParseResult<Self> {
+impl ParseFromParameter for Base64 {
+    fn parse_from_parameter(value: Option<&str>) -> ParseResult<Self> {
         match value {
             Some(value) => Ok(Self(base64::decode(value)?)),
             None => Err(ParseError::expected_input()),
         }
     }
+}
 
-    fn to_value(&self) -> Value {
+impl ToJSON for Base64 {
+    fn to_json(&self) -> Value {
         Value::String(base64::encode(&self.0))
     }
 }

@@ -6,7 +6,7 @@ use serde::{
 };
 
 use crate::registry::{
-    MetaAPI, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaSchemaRef, MetaServer, MetaTag,
+    MetaApi, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaSchemaRef, MetaServer, MetaTag,
     Registry,
 };
 
@@ -25,7 +25,7 @@ impl<'a> Serialize for MetaSchemaRef {
     }
 }
 
-struct PathMap<'a>(&'a [MetaAPI]);
+struct PathMap<'a>(&'a [MetaApi]);
 
 impl<'a> Serialize for PathMap<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -67,7 +67,7 @@ impl Serialize for MetaResponses {
 pub(crate) struct Document<'a> {
     pub(crate) info: Option<&'a MetaInfo>,
     pub(crate) servers: &'a [MetaServer],
-    pub(crate) apis: &'a [MetaAPI],
+    pub(crate) apis: &'a [MetaApi],
     pub(crate) tags: &'a [MetaTag],
     pub(crate) registry: &'a Registry,
 }

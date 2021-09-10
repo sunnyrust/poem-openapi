@@ -7,6 +7,7 @@ mod api;
 mod common_args;
 mod r#enum;
 mod error;
+mod multipart;
 mod object;
 mod request;
 mod response;
@@ -53,7 +54,7 @@ pub fn derive_request(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 #[allow(non_snake_case)]
-pub fn API(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn OpenApi(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as AttributeArgs);
     let item_impl = parse_macro_input!(input as ItemImpl);
     match api::generate(args, item_impl) {
