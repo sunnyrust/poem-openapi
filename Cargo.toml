@@ -24,8 +24,9 @@ default = []
 
 [dependencies]
 poem-openapi-derive = { path = "derive", version = "=0.3.0" }
-poem = { version = "0.5.4", features = ["multipart", "tempfile"] }
+poem = { version = "0.5.5", features = ["multipart", "tempfile"] }
 
+tokio = { version = "1.10.1", features = ["fs"] }
 serde_json = "1.0.66"
 base64 = "0.13.0"
 serde = { version = "1.0.129", features = ["derive"] }

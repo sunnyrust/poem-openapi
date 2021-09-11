@@ -2,10 +2,15 @@ use std::io::Write;
 
 use poem::{Request, RequestBody};
 use poem_openapi::{
-    payload::{Binary, Field, Payload, PlainText},
+    payload::Payload,
     registry::MetaSchema,
+    types::{
+        multipart::{JsonField, Upload},
+        Binary,
+    },
     Multipart, ParseRequestError,
 };
+use tokio::io::AsyncReadExt;
 
 fn create_multipart_payload(parts: &[(&str, Option<&str>, &[u8])]) -> Vec<u8> {
     let mut data = Vec::new();
@@ -33,7 +38,7 @@ fn create_multipart_payload(parts: &[(&str, Option<&str>, &[u8])]) -> Vec<u8> {
                 .unwrap(),
         }
 
-        data.write(part.2).unwrap();
+        data.write_all(part.2).unwrap();
         data.write_all(b"\r\n").unwrap();
     }
 
@@ -46,7 +51,7 @@ async fn rename_fields() {
     #[derive(Multipart, Debug, Eq, PartialEq)]
     #[oai(rename_fields = "UPPERCASE")]
     struct A {
-        name: PlainText,
+        name: String,
         file: Binary,
     }
 
@@ -62,7 +67,7 @@ async fn rename_fields() {
     assert_eq!(
         a,
         A {
-            name: PlainText("abc".to_string()),
+            name: "abc".to_string(),
             file: Binary(vec![1, 2, 3])
         }
     )
@@ -72,7 +77,7 @@ async fn rename_fields() {
 async fn required_fields() {
     #[derive(Multipart, Debug, Eq, PartialEq)]
     struct A {
-        name: PlainText,
+        name: String,
         file: Binary,
     }
 
@@ -85,7 +90,7 @@ async fn required_fields() {
     assert_eq!(schema.properties[0].1.unwrap_inline().ty, "string");
 
     assert_eq!(schema.properties[1].0, "file");
-    assert_eq!(schema.properties[1].1.unwrap_inline().ty, "binary");
+    assert_eq!(schema.properties[1].1.unwrap_inline().ty, "string");
 
     assert_eq!(schema.required, &["name", "file"]);
 
@@ -110,7 +115,7 @@ async fn required_fields() {
 async fn optional_fields() {
     #[derive(Multipart, Debug, Eq, PartialEq)]
     struct A {
-        name: Option<PlainText>,
+        name: Option<String>,
         file: Binary,
     }
 
@@ -123,7 +128,11 @@ async fn optional_fields() {
     assert_eq!(schema.properties[0].1.unwrap_inline().ty, "string");
 
     assert_eq!(schema.properties[1].0, "file");
-    assert_eq!(schema.properties[1].1.unwrap_inline().ty, "binary");
+    assert_eq!(schema.properties[1].1.unwrap_inline().ty, "string");
+    assert_eq!(
+        schema.properties[1].1.unwrap_inline().format,
+        Some("binary")
+    );
 
     assert_eq!(schema.required, &["file"]);
 
@@ -150,7 +159,7 @@ async fn rename_field() {
     #[derive(Multipart, Debug, Eq, PartialEq)]
     struct A {
         #[oai(name = "Name")]
-        name: PlainText,
+        name: String,
         file: Binary,
     }
 
@@ -166,7 +175,7 @@ async fn rename_field() {
     assert_eq!(
         a,
         A {
-            name: PlainText("abc".to_string()),
+            name: "abc".to_string(),
             file: Binary(vec![1, 2, 3])
         }
     )
@@ -176,7 +185,7 @@ async fn rename_field() {
 async fn skip() {
     #[derive(Multipart, Debug, Eq, PartialEq)]
     struct A {
-        name: PlainText,
+        name: String,
         file: Binary,
         #[oai(skip)]
         value1: i32,
@@ -196,24 +205,52 @@ async fn skip() {
     assert_eq!(
         a,
         A {
-            name: PlainText("abc".to_string()),
+            name: "abc".to_string(),
             file: Binary(vec![1, 2, 3]),
             value1: 0,
             value2: 0,
         }
-    )
+    );
 }
 
 #[tokio::test]
-async fn field_info() {
-    #[derive(Multipart, Debug, Eq, PartialEq)]
+async fn upload() {
+    #[derive(Multipart, Debug)]
     struct A {
-        name: PlainText,
-        file: Field<Binary>,
+        name: String,
+        file: Upload,
     }
 
     let data =
         create_multipart_payload(&[("name", None, b"abc"), ("file", Some("1.txt"), &[1, 2, 3])]);
+    let mut a = A::from_request(
+        &Request::builder()
+            .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
+            .finish(),
+        &mut RequestBody::new(data.into()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(a.name, "abc".to_string());
+
+    assert_eq!(a.file.file_name(), Some("1.txt"));
+    assert_eq!(a.file.content_type(), None);
+    let mut data = Vec::new();
+    a.file.read_to_end(&mut data).await.unwrap();
+    assert_eq!(data, vec![1, 2, 3]);
+}
+
+#[tokio::test]
+async fn validator() {
+    #[derive(Multipart, Debug, Eq, PartialEq)]
+    struct A {
+        #[oai(max_length = "10")]
+        name: String,
+        #[oai(maximum(value = "32"))]
+        value: JsonField<i32>,
+    }
+
+    let data = create_multipart_payload(&[("name", None, b"abc"), ("value", None, b"20")]);
     let a = A::from_request(
         &Request::builder()
             .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
@@ -222,8 +259,106 @@ async fn field_info() {
     )
     .await
     .unwrap();
-    assert_eq!(a.name, PlainText("abc".to_string()));
-    assert_eq!(a.file.file_name(), Some("1.txt"));
-    assert_eq!(a.file.content_type(), None);
-    assert_eq!(&*a.file, &Binary(vec![1, 2, 3]));
+    assert_eq!(a.name, "abc".to_string());
+    assert_eq!(a.value, JsonField(20));
+
+    let data = create_multipart_payload(&[("name", None, b"abc"), ("value", None, b"40")]);
+    let err = A::from_request(
+        &Request::builder()
+            .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
+            .finish(),
+        &mut RequestBody::new(data.into()),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        err,
+        ParseRequestError::ParseRequestBody {
+            reason: r#"field `value` verification failed. maximum(32, exclusive: false)"#
+                .to_string()
+        }
+    );
+}
+
+#[tokio::test]
+async fn default() {
+    #[derive(Multipart, Debug, Eq, PartialEq)]
+    struct A {
+        #[oai(default = "default_string")]
+        value_string: String,
+        #[oai(default = "default_values")]
+        value_array: JsonField<Vec<i32>>,
+    }
+
+    fn default_string() -> String {
+        "asd".to_string()
+    }
+
+    fn default_values() -> JsonField<Vec<i32>> {
+        JsonField(vec![1, 2, 3])
+    }
+
+    let schema_ref = A::schema_ref();
+    let schema: &MetaSchema = schema_ref.unwrap_inline();
+    assert_eq!(schema.properties[0].0, "valueString");
+    assert_eq!(schema.properties[0].1.unwrap_inline().ty, "string");
+    assert_eq!(
+        schema.properties[0].1.unwrap_inline().default,
+        Some("asd".into())
+    );
+
+    assert_eq!(schema.properties[1].0, "valueArray");
+    assert_eq!(schema.properties[1].1.unwrap_inline().ty, "array");
+    assert_eq!(
+        schema.properties[1]
+            .1
+            .unwrap_inline()
+            .items
+            .as_ref()
+            .map(|schema| schema.unwrap_inline().ty),
+        Some("integer")
+    );
+    assert_eq!(
+        schema.properties[1].1.unwrap_inline().default,
+        Some(vec![1, 2, 3].into())
+    );
+
+    let data = create_multipart_payload(&[
+        ("valueString", None, b"abc"),
+        ("valueArray", None, b"[10, 20, 30]"),
+    ]);
+    let a = A::from_request(
+        &Request::builder()
+            .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
+            .finish(),
+        &mut RequestBody::new(data.into()),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        a,
+        A {
+            value_string: "abc".to_string(),
+            value_array: JsonField(vec![10, 20, 30]),
+        }
+    );
+
+    let data = create_multipart_payload(&[]);
+    let a = A::from_request(
+        &Request::builder()
+            .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
+            .finish(),
+        &mut RequestBody::new(data.into()),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        a,
+        A {
+            value_string: "asd".to_string(),
+            value_array: JsonField(vec![1, 2, 3]),
+        }
+    );
 }

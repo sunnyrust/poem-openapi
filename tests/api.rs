@@ -110,7 +110,10 @@ async fn request() {
     );
     assert_eq!(
         meta_request.content[2].schema.unwrap_inline(),
-        &MetaSchema::new("binary")
+        &MetaSchema {
+            format: Some("binary"),
+            ..MetaSchema::new("string")
+        }
     );
 
     let ep = OpenApiService::new(Api).into_endpoint();

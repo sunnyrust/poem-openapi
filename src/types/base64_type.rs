@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset};
+use poem::Error;
 use serde_json::Value;
 
 use crate::{
@@ -6,10 +6,13 @@ use crate::{
     types::{ParseError, ParseFromJSON, ParseFromParameter, ParseResult, ToJSON, Type, TypeName},
 };
 
-impl Type for DateTime<FixedOffset> {
+/// Represents a binary data encoded with base64.
+pub struct Base64(pub Vec<u8>);
+
+impl Type for Base64 {
     const NAME: TypeName = TypeName::Normal {
         ty: "string",
-        format: Some("data-time"),
+        format: Some("bytes"),
     };
 
     fn schema_ref() -> MetaSchemaRef {
@@ -19,27 +22,27 @@ impl Type for DateTime<FixedOffset> {
     impl_value_type!();
 }
 
-impl ParseFromJSON for DateTime<FixedOffset> {
+impl ParseFromJSON for Base64 {
     fn parse_from_json(value: Value) -> ParseResult<Self> {
         if let Value::String(value) = value {
-            Ok(value.parse()?)
+            Ok(Self(base64::decode(value).map_err(Error::bad_request)?))
         } else {
             Err(ParseError::expected_type(value))
         }
     }
 }
 
-impl ParseFromParameter for DateTime<FixedOffset> {
+impl ParseFromParameter for Base64 {
     fn parse_from_parameter(value: Option<&str>) -> ParseResult<Self> {
         match value {
-            Some(value) => Ok(value.parse()?),
+            Some(value) => Ok(Self(base64::decode(value)?)),
             None => Err(ParseError::expected_input()),
         }
     }
 }
 
-impl ToJSON for DateTime<FixedOffset> {
+impl ToJSON for Base64 {
     fn to_json(&self) -> Value {
-        Value::String(self.to_rfc3339())
+        Value::String(base64::encode(&self.0))
     }
 }

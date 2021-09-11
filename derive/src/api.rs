@@ -302,7 +302,7 @@ fn generate_operation(
                     .create_param_checker(crate_name, &param_oai_typename)?;
                 let validators_update_meta = operation_param
                     .validators()
-                    .create_update_meta(crate_name, arg_ty)?;
+                    .create_update_meta(crate_name)?;
 
                 match &operation_param.default {
                     Some(default_value) => {

@@ -21,7 +21,10 @@ impl Payload for Binary {
     const CONTENT_TYPE: &'static str = "application/octet-stream";
 
     fn schema_ref() -> MetaSchemaRef {
-        MetaSchemaRef::Inline(MetaSchema::new("binary"))
+        MetaSchemaRef::Inline(MetaSchema {
+            format: Some("binary"),
+            ..MetaSchema::new("string")
+        })
     }
 
     async fn from_request(

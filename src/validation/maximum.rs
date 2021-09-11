@@ -1,7 +1,10 @@
 use derive_more::Display;
 use num_traits::AsPrimitive;
 
-use crate::{registry::MetaSchema, validation::Validator};
+use crate::{
+    registry::MetaSchema,
+    validation::{Validator, ValidatorMeta},
+};
 
 #[derive(Display)]
 #[display(fmt = "maximum({}, exclusive: {})", n, exclusive)]
@@ -26,7 +29,9 @@ impl<T: AsPrimitive<f64>> Validator<T> for Maximum {
             value.as_() <= self.n
         }
     }
+}
 
+impl ValidatorMeta for Maximum {
     fn update_meta(&self, meta: &mut MetaSchema) {
         meta.maximum = Some(self.n);
         if self.exclusive {

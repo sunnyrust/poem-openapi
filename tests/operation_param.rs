@@ -61,10 +61,9 @@ async fn query() {
     assert_eq!(meta.paths[0].operations[0].params[0].name, "v");
 
     let api = OpenApiService::new(Api).into_endpoint();
-    let mut resp = api
+    let resp = api
         .call(Request::builder().uri(Uri::from_static("/?v=10")).finish())
         .await;
-    println!("{}", resp.take_body().into_string().await.unwrap());
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
@@ -242,4 +241,39 @@ async fn desc() {
         meta.paths[0].operations[0].params[0].description,
         Some("ABC")
     );
+}
+
+#[tokio::test]
+async fn default_opt() {
+    struct Api;
+
+    #[OpenApi]
+    impl Api {
+        #[oai(path = "/", method = "get")]
+        async fn test(
+            &self,
+            #[oai(name = "v", in = "query", default = "default_value")] v: Option<i32>,
+        ) {
+            assert_eq!(v, Some(88));
+        }
+    }
+
+    fn default_value() -> Option<i32> {
+        Some(88)
+    }
+
+    let meta: MetaApi = Api::meta().remove(0);
+    assert_eq!(
+        meta.paths[0].operations[0].params[0]
+            .schema
+            .unwrap_inline()
+            .default,
+        Some(json!(88))
+    );
+
+    let api = OpenApiService::new(Api).into_endpoint();
+    let resp = api
+        .call(Request::builder().uri(Uri::from_static("/")).finish())
+        .await;
+    assert_eq!(resp.status(), StatusCode::OK);
 }

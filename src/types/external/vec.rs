@@ -13,6 +13,8 @@ impl<T: Type> Type for Vec<T> {
             ..MetaSchema::new("array")
         })
     }
+
+    impl_value_type!();
 }
 
 impl<T: ParseFromJSON> ParseFromJSON for Vec<T> {

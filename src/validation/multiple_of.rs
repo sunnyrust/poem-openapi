@@ -1,7 +1,10 @@
 use derive_more::Display;
 use num_traits::AsPrimitive;
 
-use crate::{registry::MetaSchema, validation::Validator};
+use crate::{
+    registry::MetaSchema,
+    validation::{Validator, ValidatorMeta},
+};
 
 #[derive(Display)]
 #[display(fmt = "multipleOf({})", n)]
@@ -21,7 +24,9 @@ impl<T: AsPrimitive<f64>> Validator<T> for MultipleOf {
     fn check(&self, value: &T) -> bool {
         value.as_() % self.n as f64 == 0.0
     }
+}
 
+impl ValidatorMeta for MultipleOf {
     fn update_meta(&self, meta: &mut MetaSchema) {
         meta.multiple_of = Some(self.n);
     }

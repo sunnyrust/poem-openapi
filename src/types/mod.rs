@@ -1,19 +1,26 @@
 //! Commonly used types.
 
+#[macro_use]
+mod macros;
+
+mod base64_type;
 mod binary;
 mod error;
 mod external;
 mod password;
 
+pub mod multipart;
+
 use std::fmt::{self, Display, Formatter};
 
-pub use binary::Base64;
+pub use base64_type::Base64;
+pub use binary::Binary;
 pub use error::{ParseError, ParseResult};
 pub use password::Password;
 use serde_json::Value;
 
 use crate::{
-    poem::web::Field,
+    poem::web::Field as PoemField,
     registry::{MetaSchemaRef, Registry},
 };
 
@@ -54,12 +61,18 @@ pub trait Type: Sized + Send + Sync {
     /// If it is `true`, it means that this value is required.
     const IS_REQUIRED: bool = true;
 
+    /// The value type of this type.
+    type ValueType;
+
     /// Get schema reference of this type.
     fn schema_ref() -> MetaSchemaRef;
 
     /// Register this type to types registry.
     #[allow(unused_variables)]
     fn register(registry: &mut Registry) {}
+
+    /// Get the value.
+    fn as_value(&self) -> Option<&Self::ValueType>;
 }
 
 /// Represents a type that can parsing from JSON.
@@ -75,10 +88,11 @@ pub trait ParseFromParameter: Type {
     fn parse_from_parameter(value: Option<&str>) -> ParseResult<Self>;
 }
 
-/// Represents a type that can parsing from multipart field.
+/// Represents a type that can parsing from multipart.
+#[poem::async_trait]
 pub trait ParseFromMultipartField: Type {
     /// Parse from parameter.
-    fn parse_from_field(field: Option<Field>) -> ParseResult<Self>;
+    async fn parse_from_multipart(field: Option<PoemField>) -> ParseResult<Self>;
 }
 
 /// Represents a type that can converted to JSON.

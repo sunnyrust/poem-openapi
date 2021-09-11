@@ -17,6 +17,8 @@ macro_rules! impl_type_for_integers {
             fn schema_ref() -> MetaSchemaRef {
                 MetaSchemaRef::Inline(Self::NAME.into())
             }
+
+            impl_value_type!();
         }
 
         impl ParseFromJSON for $ty {

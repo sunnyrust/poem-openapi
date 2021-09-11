@@ -22,6 +22,8 @@ use crate::registry::MetaSchema;
 
 pub trait Validator<T>: Display {
     fn check(&self, value: &T) -> bool;
+}
 
+pub trait ValidatorMeta {
     fn update_meta(&self, meta: &mut MetaSchema);
 }

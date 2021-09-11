@@ -2,7 +2,11 @@ use std::ops::Deref;
 
 use derive_more::Display;
 
-use crate::{registry::MetaSchema, types::Type, validation::Validator};
+use crate::{
+    registry::MetaSchema,
+    types::Type,
+    validation::{Validator, ValidatorMeta},
+};
 
 #[derive(Display)]
 #[display(fmt = "minItems({})", len)]
@@ -22,7 +26,9 @@ impl<T: Deref<Target = [E]>, E: Type> Validator<T> for MinItems {
     fn check(&self, value: &T) -> bool {
         value.deref().len() >= self.len
     }
+}
 
+impl ValidatorMeta for MinItems {
     fn update_meta(&self, meta: &mut MetaSchema) {
         meta.min_items = Some(self.len);
     }

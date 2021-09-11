@@ -2,7 +2,7 @@ use darling::util::SpannedValue;
 use proc_macro2::TokenStream;
 use quote::quote;
 use regex::Regex;
-use syn::{Error, Type};
+use syn::Error;
 
 use crate::{
     common_args::{MaximumValidator, MinimumValidator},
@@ -96,8 +96,10 @@ impl<'a> Validators<'a> {
         if !validators.is_empty() {
             Ok(Some(quote! {
                 for validator in [#(#validators),*] {
-                    if !#crate_name::validation::Validator::check(&validator, &value) {
-                        return Err(#crate_name::types::ParseError::<Self>::custom(format!("field `{}` verification failed. {}", #field_name, validator)));
+                    if let ::std::option::Option::Some(value) = #crate_name::types::Type::as_value(&value) {
+                        if !#crate_name::validation::Validator::check(&validator, value) {
+                            return Err(#crate_name::types::ParseError::<Self>::custom(format!("field `{}` verification failed. {}", #field_name, validator)));
+                        }
                     }
                 }
             }))
@@ -115,12 +117,37 @@ impl<'a> Validators<'a> {
         if !validators.is_empty() {
             Ok(Some(quote! {
                 for validator in [#(#validators),*] {
-                    if !#crate_name::validation::Validator::check(&validator, &value) {
-                        let err = #crate_name::ParseRequestError::ParseParam {
-                            name: #arg_name,
-                            reason: ::std::format!("verification failed. {}", validator),
-                        };
-                        return Err(#crate_name::poem::Error::bad_request(err));
+                    if let ::std::option::Option::Some(value) = #crate_name::types::Type::as_value(&value) {
+                        if !#crate_name::validation::Validator::check(&validator, value) {
+                            let err = #crate_name::ParseRequestError::ParseParam {
+                                name: #arg_name,
+                                reason: ::std::format!("verification failed. {}", validator),
+                            };
+                            return Err(#crate_name::poem::Error::bad_request(err));
+                        }
+                    }
+                }
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn create_multipart_field_checker(
+        &self,
+        crate_name: &TokenStream,
+        field_name: &str,
+    ) -> GeneratorResult<Option<TokenStream>> {
+        let validators = self.create_validators(crate_name)?;
+        if !validators.is_empty() {
+            Ok(Some(quote! {
+                for validator in [#(#validators),*] {
+                    if let ::std::option::Option::Some(value) = #crate_name::types::Type::as_value(&value) {
+                        if !#crate_name::validation::Validator::check(&validator, value) {
+                            return Err(#crate_name::ParseRequestError::ParseRequestBody {
+                                reason: ::std::format!("field `{}` verification failed. {}", #field_name, validator),
+                            });
+                        }
                     }
                 }
             }))
@@ -132,13 +159,12 @@ impl<'a> Validators<'a> {
     pub(crate) fn create_update_meta(
         &self,
         crate_name: &TokenStream,
-        ty: &Type,
     ) -> GeneratorResult<Option<TokenStream>> {
         let validators = self.create_validators(crate_name)?;
         if !validators.is_empty() {
             Ok(Some(quote! {
                 for validator in [#(#validators),*] {
-                    #crate_name::validation::Validator::<#ty>::update_meta(&validator, schema);
+                    #crate_name::validation::ValidatorMeta::update_meta(&validator, schema);
                 }
             }))
         } else {

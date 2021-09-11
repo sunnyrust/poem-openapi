@@ -27,6 +27,8 @@ impl Type for Password {
     fn schema_ref() -> MetaSchemaRef {
         MetaSchemaRef::Inline(Self::NAME.into())
     }
+
+    impl_value_type!();
 }
 
 impl ParseFromJSON for Password {

@@ -123,6 +123,12 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
             };
             const IS_REQUIRED: bool = #is_required;
 
+            type ValueType = Self;
+
+            fn as_value(&self) -> ::std::option::Option<&Self> {
+                ::std::option::Option::Some(self)
+            }
+
             fn schema_ref() -> #crate_name::registry::MetaSchemaRef {
                 #crate_name::registry::MetaSchemaRef::Reference(#oai_typename)
             }

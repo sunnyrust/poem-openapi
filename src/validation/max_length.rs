@@ -1,6 +1,9 @@
 use derive_more::Display;
 
-use crate::{registry::MetaSchema, validation::Validator};
+use crate::{
+    registry::MetaSchema,
+    validation::{Validator, ValidatorMeta},
+};
 
 #[derive(Display)]
 #[display(fmt = "maxLength({})", len)]
@@ -20,7 +23,9 @@ impl<T: AsRef<str>> Validator<T> for MaxLength {
     fn check(&self, value: &T) -> bool {
         value.as_ref().len() <= self.len
     }
+}
 
+impl ValidatorMeta for MaxLength {
     fn update_meta(&self, meta: &mut MetaSchema) {
         meta.max_length = Some(self.len);
     }

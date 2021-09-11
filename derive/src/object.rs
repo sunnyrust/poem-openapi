@@ -118,15 +118,12 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         let (field_title, field_description) = get_summary_and_description(&field.attrs)?;
         let field_title = optional_literal(&field_title);
         let field_description = optional_literal(&field_description);
-
-        fields.push(field_ident);
-
         let validators_checker = field
             .validators()
             .create_obj_field_checker(&crate_name, &field_name)?;
-        let validators_update_meta = field
-            .validators()
-            .create_update_meta(&crate_name, field_ty)?;
+        let validators_update_meta = field.validators().create_update_meta(&crate_name)?;
+
+        fields.push(field_ident);
 
         match &field.default {
             Some(default_value) => {
@@ -265,12 +262,18 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 };
                 const IS_REQUIRED: bool = #is_required;
 
+                type ValueType = Self;
+
                 fn schema_ref() -> #crate_name::registry::MetaSchemaRef {
                     #crate_name::registry::MetaSchemaRef::Reference(#oai_typename)
                 }
 
                 fn register(registry: &mut #crate_name::registry::Registry) {
                     registry.create_schema(#oai_typename, |registry| #meta);
+                }
+
+                fn as_value(&self) -> ::std::option::Option<&Self> {
+                    ::std::option::Option::Some(self)
                 }
             }
 
@@ -353,6 +356,12 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     };
                     const IS_REQUIRED: bool = #is_required;
 
+                    type ValueType = Self;
+
+                    fn as_value(&self) -> Option<&Self> {
+                        Some(self)
+                    }
+
                     fn schema_ref() -> #crate_name::registry::MetaSchemaRef {
                         #crate_name::registry::MetaSchemaRef::Reference(#oai_typename)
                     }
@@ -393,8 +402,5 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         quote!(#(#code)*)
     };
 
-    if oai_typename == "A1" {
-        println!("{}", expanded);
-    }
     Ok(expanded)
 }

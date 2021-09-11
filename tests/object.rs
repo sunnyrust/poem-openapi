@@ -192,10 +192,16 @@ fn field_default() {
         a: i32,
         #[oai(default = "default_b")]
         b: i32,
+        #[oai(default = "default_c")]
+        c: Option<i32>,
     }
 
     fn default_b() -> i32 {
         100
+    }
+
+    fn default_c() -> Option<i32> {
+        Some(200)
     }
 
     let meta = get_meta::<Obj>();
@@ -206,26 +212,42 @@ fn field_default() {
     let field_meta = meta.properties[1].1.unwrap_inline();
     assert_eq!(field_meta.default, Some(json!(100)));
 
+    let field_meta = meta.properties[2].1.unwrap_inline();
+    assert_eq!(field_meta.default, Some(json!(200)));
+
     assert_eq!(
         Obj::parse_from_json(json!({
             "a": 1,
         }))
         .unwrap(),
-        Obj { a: 1, b: 100 }
+        Obj {
+            a: 1,
+            b: 100,
+            c: Some(200)
+        }
     );
 
     assert_eq!(
         Obj::parse_from_json(json!({})).unwrap(),
-        Obj { a: 0, b: 100 }
+        Obj {
+            a: 0,
+            b: 100,
+            c: Some(200)
+        }
     );
 
     assert_eq!(
         Obj::parse_from_json(json!({
             "a": 33,
-            "b":44,
+            "b": 44,
+            "c": 55,
         }))
         .unwrap(),
-        Obj { a: 33, b: 44 }
+        Obj {
+            a: 33,
+            b: 44,
+            c: Some(55)
+        }
     );
 }
 

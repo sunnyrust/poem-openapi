@@ -232,3 +232,29 @@ async fn param_validator() {
         .await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+#[test]
+fn test_option() {
+    #[derive(Object, Debug, Eq, PartialEq)]
+    struct A {
+        #[oai(multiple_of = "10")]
+        n: Option<i32>,
+    }
+
+    assert_eq!(
+        A::parse_from_json(json!({ "n": 20 })).unwrap(),
+        A { n: Some(20) }
+    );
+
+    assert_eq!(
+        A::parse_from_json(json!({ "n": null })).unwrap(),
+        A { n: None }
+    );
+
+    assert_eq!(
+        A::parse_from_json(json!({ "n": 25 }))
+            .unwrap_err()
+            .into_message(),
+        "failed to parse \"A\": field `n` verification failed. multipleOf(10)"
+    );
+}

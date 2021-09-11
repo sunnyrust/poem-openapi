@@ -1,8 +1,12 @@
+use poem::web::Field;
 use serde_json::Value;
 
 use crate::{
     registry::MetaSchemaRef,
-    types::{ParseError, ParseFromJSON, ParseFromParameter, ParseResult, ToJSON, Type, TypeName},
+    types::{
+        ParseError, ParseFromJSON, ParseFromMultipartField, ParseFromParameter, ParseResult,
+        ToJSON, Type, TypeName,
+    },
 };
 
 impl Type for String {
@@ -14,6 +18,8 @@ impl Type for String {
     fn schema_ref() -> MetaSchemaRef {
         MetaSchemaRef::Inline(Self::NAME.into())
     }
+
+    impl_value_type!();
 }
 
 impl ParseFromJSON for String {
@@ -35,6 +41,16 @@ impl ParseFromParameter for String {
     }
 }
 
+#[poem::async_trait]
+impl ParseFromMultipartField for String {
+    async fn parse_from_multipart(field: Option<Field>) -> ParseResult<Self> {
+        match field {
+            Some(field) => Ok(field.text().await.map_err(ParseError::custom)?),
+            None => Err(ParseError::expected_input()),
+        }
+    }
+}
+
 impl ToJSON for String {
     fn to_json(&self) -> Value {
         Value::String(self.clone())
@@ -50,6 +66,8 @@ impl<'a> Type for &'a str {
     fn schema_ref() -> MetaSchemaRef {
         MetaSchemaRef::Inline(Self::NAME.into())
     }
+
+    impl_value_type!();
 }
 
 impl<'a> ToJSON for &'a str {
