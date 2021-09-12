@@ -1,7 +1,10 @@
 use crate::{
+    poem::web::Field as PoemField,
     registry::{MetaSchema, MetaSchemaRef},
     serde_json::Value,
-    types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type, TypeName},
+    types::{
+        ParseError, ParseFromJSON, ParseFromMultipartField, ParseResult, ToJSON, Type, TypeName,
+    },
 };
 
 impl<T: Type> Type for Vec<T> {
@@ -29,6 +32,29 @@ impl<T: ParseFromJSON> ParseFromJSON for Vec<T> {
             }
             _ => Err(ParseError::expected_type(value)),
         }
+    }
+}
+
+#[poem::async_trait]
+impl<T: ParseFromMultipartField> ParseFromMultipartField for Vec<T> {
+    async fn parse_from_multipart(field: Option<PoemField>) -> ParseResult<Self> {
+        match field {
+            Some(field) => {
+                let item = T::parse_from_multipart(Some(field))
+                    .await
+                    .map_err(ParseError::propagate)?;
+                Ok(vec![item])
+            }
+            None => Ok(Vec::new()),
+        }
+    }
+
+    async fn parse_from_repeated_field(mut self, field: PoemField) -> ParseResult<Self> {
+        let item = T::parse_from_multipart(Some(field))
+            .await
+            .map_err(ParseError::propagate)?;
+        self.push(item);
+        Ok(self)
     }
 }
 

@@ -91,8 +91,13 @@ pub trait ParseFromParameter: Type {
 /// Represents a type that can parsing from multipart.
 #[poem::async_trait]
 pub trait ParseFromMultipartField: Type {
-    /// Parse from parameter.
+    /// Parse from multipart field.
     async fn parse_from_multipart(field: Option<PoemField>) -> ParseResult<Self>;
+
+    /// Parse from repeated multipart field.
+    async fn parse_from_repeated_field(self, _field: PoemField) -> ParseResult<Self> {
+        Err(ParseError::<Self>::custom("repeated field"))
+    }
 }
 
 /// Represents a type that can converted to JSON.

@@ -359,3 +359,72 @@ async fn default() {
         }
     );
 }
+
+#[tokio::test]
+async fn array() {
+    #[derive(Multipart, Debug, Eq, PartialEq)]
+    struct A {
+        value: Vec<String>,
+        value2: Vec<String>,
+    }
+
+    let schema_ref = A::schema_ref();
+    let schema: &MetaSchema = schema_ref.unwrap_inline();
+    assert_eq!(schema.properties[0].0, "value");
+    assert_eq!(schema.properties[0].1.unwrap_inline().ty, "array");
+    assert_eq!(
+        schema.properties[0]
+            .1
+            .unwrap_inline()
+            .items
+            .as_ref()
+            .map(|schema| schema.unwrap_inline().ty),
+        Some("string")
+    );
+
+    let data = create_multipart_payload(&[
+        ("value", None, b"a1"),
+        ("value", None, b"a2"),
+        ("value", None, b"a3"),
+    ]);
+    let a = A::from_request(
+        &Request::builder()
+            .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
+            .finish(),
+        &mut RequestBody::new(data.into()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        a,
+        A {
+            value: vec!["a1".to_string(), "a2".to_string(), "a3".to_string()],
+            value2: vec![],
+        }
+    )
+}
+
+#[tokio::test]
+async fn repeated_error() {
+    #[derive(Multipart, Debug, Eq, PartialEq)]
+    struct A {
+        value: String,
+    }
+
+    let data = create_multipart_payload(&[("value", None, b"a1"), ("value", None, b"a2")]);
+    let err = A::from_request(
+        &Request::builder()
+            .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
+            .finish(),
+        &mut RequestBody::new(data.into()),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        err,
+        ParseRequestError::ParseRequestBody {
+            reason: "failed to parse field `value`: failed to parse \"string\": repeated field"
+                .to_string()
+        }
+    )
+}

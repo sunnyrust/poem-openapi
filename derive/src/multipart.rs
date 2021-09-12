@@ -115,9 +115,18 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
 
         deserialize_fields.push(quote! {
             if field.name() == ::std::option::Option::Some(#field_name) {
-                #field_ident = ::std::option::Option::Some(<#field_ty as #crate_name::types::ParseFromMultipartField>::parse_from_multipart(::std::option::Option::Some(field)).await.map_err(|err|
-                    #crate_name::ParseRequestError::ParseRequestBody { reason: ::std::format!("failed to parse field `{}`: {}", #field_name, err.into_message()) }
-                )?);
+                #field_ident = match #field_ident {
+                    ::std::option::Option::Some(value) => {
+                        ::std::option::Option::Some(<#field_ty as #crate_name::types::ParseFromMultipartField>::parse_from_repeated_field(value, field).await.map_err(|err|
+                            #crate_name::ParseRequestError::ParseRequestBody { reason: ::std::format!("failed to parse field `{}`: {}", #field_name, err.into_message()) }
+                        )?)
+                    }
+                    ::std::option::Option::None => {
+                        ::std::option::Option::Some(<#field_ty as #crate_name::types::ParseFromMultipartField>::parse_from_multipart(::std::option::Option::Some(field)).await.map_err(|err|
+                            #crate_name::ParseRequestError::ParseRequestBody { reason: ::std::format!("failed to parse field `{}`: {}", #field_name, err.into_message()) }
+                        )?)
+                    }
+                };
                 continue;
             }
         });
