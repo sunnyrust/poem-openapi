@@ -1,12 +1,12 @@
 use poem::{
     http::{Method, StatusCode, Uri},
-    Endpoint, Error, IntoEndpoint,
+    Endpoint, IntoEndpoint,
 };
 use poem_openapi::{
     payload::{Binary, Json, PlainText},
     registry::{MetaApi, MetaSchema},
     types::Type,
-    OpenApi, OpenApiService, Request, Response,
+    OpenApi, OpenApiService, ParseRequestError, Request, Response,
 };
 
 #[tokio::test]
@@ -264,7 +264,7 @@ async fn bad_request_handler() {
         BadRequest(PlainText),
     }
 
-    fn bad_request_handler(err: Error) -> MyResponse {
+    fn bad_request_handler(err: ParseRequestError) -> MyResponse {
         MyResponse::BadRequest(format!("!!! {}", err).into())
     }
 
@@ -304,6 +304,6 @@ async fn bad_request_handler() {
     assert_eq!(resp.content_type(), Some("text/plain"));
     assert_eq!(
         resp.take_body().into_string().await.unwrap(),
-        r#"!!! 400: failed to parse param `code`: Type "integer($uint16)" expects an input value."#
+        r#"!!! failed to parse param `code`: Type "integer($uint16)" expects an input value."#
     );
 }

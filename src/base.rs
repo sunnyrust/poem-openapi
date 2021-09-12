@@ -1,8 +1,9 @@
-use poem::{route::Route, Error, IntoResponse, RequestBody, Result};
+use poem::{route::Route, IntoResponse, RequestBody, Result};
 
 use crate::{
     payload::Payload,
     registry::{MetaApi, MetaMediaType, MetaRequest, MetaResponse, MetaResponses, Registry},
+    ParseRequestError,
 };
 
 /// Represents a OpenAPI request object.
@@ -17,7 +18,10 @@ pub trait Request: Sized {
     fn register(registry: &mut Registry);
 
     /// Parse the request object from the HTTP request.
-    async fn from_request(request: &poem::Request, body: &mut RequestBody) -> Result<Self>;
+    async fn from_request(
+        request: &poem::Request,
+        body: &mut RequestBody,
+    ) -> Result<Self, ParseRequestError>;
 }
 
 #[poem::async_trait]
@@ -37,10 +41,11 @@ impl<T: Payload> Request for T {
         T::register(registry);
     }
 
-    async fn from_request(request: &poem::Request, body: &mut RequestBody) -> Result<Self> {
-        T::from_request(request, body)
-            .await
-            .map_err(Error::bad_request)
+    async fn from_request(
+        request: &poem::Request,
+        body: &mut RequestBody,
+    ) -> Result<Self, ParseRequestError> {
+        T::from_request(request, body).await
     }
 }
 
@@ -58,9 +63,9 @@ pub trait Response: IntoResponse + Sized {
     /// Register the schema contained in this response object to the registry.
     fn register(registry: &mut Registry);
 
-    /// Convert [`Error`](poem::Error) to this response object.
+    /// Convert [`ParseRequestError`] to this response object.
     #[allow(unused_variables)]
-    fn from_parse_request_error(err: Error) -> Self {
+    fn from_parse_request_error(err: ParseRequestError) -> Self {
         unreachable!()
     }
 }

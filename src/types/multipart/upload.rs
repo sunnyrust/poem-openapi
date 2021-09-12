@@ -1,13 +1,9 @@
-use std::{
-    fmt::{self, Debug, Formatter},
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::fmt::{self, Debug, Formatter};
 
 use poem::web::Field as PoemField;
 use tokio::{
     fs::File,
-    io::{AsyncRead, ReadBuf},
+    io::{AsyncRead, AsyncReadExt, Error as IoError, ErrorKind},
 };
 
 use crate::{
@@ -47,15 +43,29 @@ impl Upload {
     pub fn file_name(&self) -> Option<&str> {
         self.file_name.as_deref()
     }
-}
 
-impl AsyncRead for Upload {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.file).poll_read(cx, buf)
+    /// Consumes this body object to return a [`Vec<u8>`] that contains all
+    /// data.
+    pub async fn into_vec(self) -> Result<Vec<u8>, IoError> {
+        let mut data = Vec::new();
+        self.into_async_read().read_to_end(&mut data).await?;
+        Ok(data)
+    }
+
+    /// Consumes this body object to return a [`String`] that contains all data.
+    pub async fn into_string(self) -> Result<String, IoError> {
+        Ok(String::from_utf8(
+            self.into_vec()
+                .await
+                .map_err(|err| IoError::new(ErrorKind::Other, err))?
+                .to_vec(),
+        )
+        .map_err(|err| IoError::new(ErrorKind::Other, err))?)
+    }
+
+    /// Consumes this body object to return a reader.
+    pub fn into_async_read(self) -> impl AsyncRead + Unpin + Send + 'static {
+        self.file
     }
 }
 

@@ -103,8 +103,7 @@ pub use poem_openapi_derive::Request;
 /// # Examples
 /// 
 /// ```
-/// use poem_openapi::{payload::PlainText, Response};
-/// use poem::Error;
+/// use poem_openapi::{payload::PlainText, Response, ParseRequestError};
 ///
 /// #[derive(Response)]
 /// #[oai(bad_request_handler = "bad_request_handler")]
@@ -119,9 +118,9 @@ pub use poem_openapi_derive::Request;
 ///     #[oai(status = 400)]
 ///     BadRequest(PlainText),
 /// }
-/// 
+///
 /// // Convert error to `CreateUserResponse::BadRequest`.
-/// fn bad_request_handler(err: Error) -> CreateUserResponse {
+/// fn bad_request_handler(err: ParseRequestError) -> CreateUserResponse {
 ///     CreateUserResponse::BadRequest(PlainText(format!("error: {}", err)))
 /// }
 /// ```

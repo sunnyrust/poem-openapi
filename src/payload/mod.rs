@@ -33,3 +33,22 @@ pub trait Payload: Sized {
         body: &mut RequestBody,
     ) -> Result<Self, ParseRequestError>;
 }
+
+#[poem::async_trait]
+impl<T: Payload> Payload for poem::Result<T> {
+    const CONTENT_TYPE: &'static str = T::CONTENT_TYPE;
+
+    fn schema_ref() -> MetaSchemaRef {
+        T::schema_ref()
+    }
+
+    async fn from_request(
+        request: &Request,
+        body: &mut RequestBody,
+    ) -> Result<Self, ParseRequestError> {
+        match T::from_request(request, body).await {
+            Ok(payload) => Ok(Ok(payload)),
+            Err(err) => Ok(Err(err.into())),
+        }
+    }
+}

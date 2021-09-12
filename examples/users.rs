@@ -142,7 +142,7 @@ async fn main() {
         .unwrap()
         .run(
             OpenApiService::new(Api::default())
-                .title("poem-openapi")
+                .title("Users")
                 .version("0.1.0")
                 .server_with_description("http://localhost:3000", "localhost")
                 .tag_with_description("user", "Operations about user")

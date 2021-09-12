@@ -20,7 +20,7 @@ async fn main() {
     poem::Server::new(listener)
         .await
         .unwrap()
-        .run(OpenApiService::new(Api).title("hello World").ui_path("/ui"))
+        .run(OpenApiService::new(Api).title("Hello World").ui_path("/ui"))
         .await
         .unwrap();
 }

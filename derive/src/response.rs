@@ -143,7 +143,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
         Some(name) => {
             let name = format_ident!("{}", name);
             Some(quote! {
-                fn from_parse_request_error(err: #crate_name::poem::Error) -> Self {
+                fn from_parse_request_error(err: #crate_name::ParseRequestError) -> Self {
                     #name(err)
                 }
             })

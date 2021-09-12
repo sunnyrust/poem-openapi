@@ -10,7 +10,6 @@ use poem_openapi::{
     },
     Multipart, ParseRequestError,
 };
-use tokio::io::AsyncReadExt;
 
 fn create_multipart_payload(parts: &[(&str, Option<&str>, &[u8])]) -> Vec<u8> {
     let mut data = Vec::new();
@@ -223,7 +222,7 @@ async fn upload() {
 
     let data =
         create_multipart_payload(&[("name", None, b"abc"), ("file", Some("1.txt"), &[1, 2, 3])]);
-    let mut a = A::from_request(
+    let a = A::from_request(
         &Request::builder()
             .header("content-type", "multipart/form-data; boundary=X-BOUNDARY")
             .finish(),
@@ -235,9 +234,7 @@ async fn upload() {
 
     assert_eq!(a.file.file_name(), Some("1.txt"));
     assert_eq!(a.file.content_type(), None);
-    let mut data = Vec::new();
-    a.file.read_to_end(&mut data).await.unwrap();
-    assert_eq!(data, vec![1, 2, 3]);
+    assert_eq!(a.file.into_vec().await.unwrap(), vec![1, 2, 3]);
 }
 
 #[tokio::test]

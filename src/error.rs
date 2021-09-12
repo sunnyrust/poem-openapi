@@ -30,4 +30,22 @@ pub enum ParseRequestError {
     /// The client request does not include the `Content-Type` header.
     #[error("expect a `Content-Type` header.")]
     ExpectContentType,
+
+    /// Poem extractor error.
+    #[error("poem extract error: {0}")]
+    Extractor(String),
+}
+
+impl From<ParseRequestError> for poem::Error {
+    fn from(err: ParseRequestError) -> Self {
+        match &err {
+            ParseRequestError::ParseParam { .. } => poem::Error::bad_request(err),
+            ParseRequestError::ParseRequestBody { .. } => poem::Error::bad_request(err),
+            ParseRequestError::ContentTypeNotSupported { .. } => {
+                poem::Error::method_not_allowed(err)
+            }
+            ParseRequestError::ExpectContentType => poem::Error::method_not_allowed(err),
+            ParseRequestError::Extractor(_) => poem::Error::bad_request(err),
+        }
+    }
 }

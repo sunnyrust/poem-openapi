@@ -40,7 +40,7 @@ async fn main() {
         .unwrap()
         .run(
             OpenApiService::new(Api1.combine(Api2).combine(Api3))
-                .title("hello World")
+                .title("Combined APIs")
                 .ui_path("/"),
         )
         .await

@@ -38,7 +38,7 @@ enum CreateUserResponse {
     BadRequest(::poem_openapi::payload::PlainText),
 }
 
-fn bad_request_handler(err: ::poem_openapi::poem::Error) -> CreateUserResponse {
+fn bad_request_handler(err: ::poem_openapi::ParseRequestError) -> CreateUserResponse {
     CreateUserResponse::BadRequest(::poem_openapi::payload::PlainText(::std::format!(
         "error: {}",
         err

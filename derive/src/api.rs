@@ -248,12 +248,12 @@ fn generate_operation(
             // is poem extractor
             Some(operation_param) if operation_param.extract => {
                 parse_args.push(quote! {
-                    let #pname = match <#arg_ty as #crate_name::poem::FromRequest>::from_request(&request, &mut body).await.map_err(#crate_name::poem::Error::from) {
+                    let #pname = match <#arg_ty as #crate_name::poem::FromRequest>::from_request(&request, &mut body).await.map_err(|err| #crate_name::ParseRequestError::Extractor(::std::string::ToString::to_string(err))) {
                         ::std::result::Result::Ok(value) => value,
                         ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
                                 return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
                             },
-                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(::std::convert::Into::into(err)),
                     };
                 });
                 use_args.push(pname);
@@ -320,10 +320,10 @@ fn generate_operation(
                                 match value {
                                     Some(value) => {
                                         match #crate_name::types::ParseFromParameter::parse_from_parameter(Some(value))
-                                                .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
+                                                .map_err(|err| #crate_name::ParseRequestError::ParseParam {
                                                     name: #param_oai_typename,
                                                     reason: err.into_message(),
-                                                }))
+                                                })
                                         {
                                             ::std::result::Result::Ok(value) => {
                                                 #validators_checker
@@ -332,7 +332,7 @@ fn generate_operation(
                                             ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
                                                 return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
                                             },
-                                            ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                                            ::std::result::Result::Err(err) => return ::std::result::Result::Err(#crate_name::poem::Error::from(err)),
                                         }
                                     }
                                     None => #default_value,
@@ -345,10 +345,10 @@ fn generate_operation(
                             let #pname = {
                                 let value = #crate_name::param::get(#param_oai_typename, #meta_in, &request, &query.0);
                                 match #crate_name::types::ParseFromParameter::parse_from_parameter(value.as_deref())
-                                        .map_err(|err| #crate_name::poem::Error::bad_request(#crate_name::ParseRequestError::ParseParam {
+                                        .map_err(|err| #crate_name::ParseRequestError::ParseParam {
                                             name: #param_oai_typename,
                                             reason: err.into_message(),
-                                        }))
+                                        })
                                 {
                                     ::std::result::Result::Ok(value) => {
                                         #validators_checker
@@ -357,7 +357,7 @@ fn generate_operation(
                                     ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
                                         return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
                                     },
-                                    ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                                    ::std::result::Result::Err(err) => return ::std::result::Result::Err(::std::convert::Into::into(err)),
                                 }
                             };
                         });
@@ -414,7 +414,7 @@ fn generate_operation(
                         ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
                                 return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
                             },
-                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(::std::convert::Into::into(err)),
                     };
                 });
                 use_args.push(pname);

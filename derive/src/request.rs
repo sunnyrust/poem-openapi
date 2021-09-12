@@ -57,7 +57,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                 from_requests.push(quote! {
                     ::std::option::Option::Some(<#payload_ty as #crate_name::payload::Payload>::CONTENT_TYPE) => {
                         ::std::result::Result::Ok(#ident::#item_ident(
-                            <#payload_ty as #crate_name::payload::Payload>::from_request(request, body).await.map_err(#crate_name::poem::Error::bad_request)?
+                            <#payload_ty as #crate_name::payload::Payload>::from_request(request, body).await?
                         ))
                     }
                 });
@@ -93,14 +93,14 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
                     #(<#schemas as #crate_name::payload::Payload>::register(registry);)*
                 }
 
-                async fn from_request(request: &#crate_name::poem::Request, body: &mut #crate_name::poem::RequestBody) -> #crate_name::poem::Result<Self> {
+                async fn from_request(request: &#crate_name::poem::Request, body: &mut #crate_name::poem::RequestBody) -> ::std::result::Result<Self, #crate_name::ParseRequestError> {
                     let content_type = request.content_type();
                     match content_type {
                         #(#from_requests)*
-                        ::std::option::Option::Some(content_type) => ::std::result::Result::Err(#crate_name::poem::Error::method_not_allowed(#crate_name::ParseRequestError::ContentTypeNotSupported {
+                        ::std::option::Option::Some(content_type) => ::std::result::Result::Err(#crate_name::ParseRequestError::ContentTypeNotSupported {
                             content_type: ::std::string::ToString::to_string(content_type),
-                        })),
-                        ::std::option::Option::None => ::std::result::Result::Err(#crate_name::poem::Error::method_not_allowed(#crate_name::ParseRequestError::ExpectContentType)),
+                        }),
+                        ::std::option::Option::None => ::std::result::Result::Err(#crate_name::ParseRequestError::ExpectContentType),
                     }
                 }
             }
