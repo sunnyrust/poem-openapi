@@ -1,4 +1,4 @@
-//! Commonly used types.
+//! Commonly used data types.
 
 #[macro_use]
 mod macros;
