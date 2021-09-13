@@ -195,6 +195,17 @@ pub struct MetaResponses {
 }
 
 #[derive(Debug, PartialEq, Serialize)]
+pub struct MetaHeader {
+    #[serde(skip)]
+    pub name: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<&'static str>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub required: bool,
+    pub schema: MetaSchemaRef,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetaResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
@@ -205,6 +216,22 @@ pub struct MetaResponse {
         serialize_with = "serialize_content"
     )]
     pub content: Vec<MetaMediaType>,
+    #[serde(
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_headers"
+    )]
+    pub headers: Vec<MetaHeader>,
+}
+
+fn serialize_headers<S: Serializer>(
+    properties: &[MetaHeader],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let mut s = serializer.serialize_map(None)?;
+    for header in properties {
+        s.serialize_entry(&header.name, &header)?;
+    }
+    s.end()
 }
 
 #[derive(Debug, PartialEq, Serialize)]

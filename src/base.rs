@@ -77,6 +77,7 @@ impl Response for () {
                 description: None,
                 status: Some(200),
                 content: vec![],
+                headers: vec![],
             }],
         }
     }
@@ -94,6 +95,7 @@ impl<T: Payload + IntoResponse> Response for T {
                     content_type: T::CONTENT_TYPE,
                     schema: T::schema_ref(),
                 }],
+                headers: vec![],
             }],
         }
     }
