@@ -2,7 +2,13 @@ use poem::{
     http::{StatusCode, Uri},
     Endpoint, IntoEndpoint, Request,
 };
-use poem_openapi::{registry::MetaApi, types::ParseFromJSON, Object, OpenApi, OpenApiService};
+use poem_openapi::{
+    registry::{MetaApi, MetaSchema},
+    types::ParseFromJSON,
+    validation,
+    validation::ValidatorMeta,
+    Object, OpenApi, OpenApiService,
+};
 use serde_json::json;
 
 #[test]
@@ -20,6 +26,10 @@ fn test_multiple_of() {
             .into_message(),
         "failed to parse \"A\": field `n` verification failed. multipleOf(10)"
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::MultipleOf::new(10.0).update_meta(&mut schema);
+    assert_eq!(schema.multiple_of, Some(10.0));
 }
 
 #[test]
@@ -44,6 +54,11 @@ fn test_maximum() {
             .into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: false)"
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::Maximum::new(10.0, false).update_meta(&mut schema);
+    assert_eq!(schema.maximum, Some(10.0));
+    assert_eq!(schema.exclusive_maximum, None);
 }
 
 #[test]
@@ -70,6 +85,11 @@ fn test_maximum_exclusive() {
             .into_message(),
         "failed to parse \"A\": field `n` verification failed. maximum(500, exclusive: true)"
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::Maximum::new(10.0, true).update_meta(&mut schema);
+    assert_eq!(schema.maximum, Some(10.0));
+    assert_eq!(schema.exclusive_maximum, Some(true));
 }
 
 #[test]
@@ -92,6 +112,10 @@ fn test_max_length() {
             .into_message(),
         "failed to parse \"A\": field `value` verification failed. maxLength(5)"
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::MaxLength::new(10).update_meta(&mut schema);
+    assert_eq!(schema.max_length, Some(10));
 }
 
 #[test]
@@ -114,6 +138,10 @@ fn test_min_length() {
             .into_message(),
         "failed to parse \"A\": field `value` verification failed. minLength(5)"
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::MinLength::new(10).update_meta(&mut schema);
+    assert_eq!(schema.min_length, Some(10));
 }
 
 #[test]
@@ -136,6 +164,10 @@ fn test_pattern() {
             .into_message(),
         r#"failed to parse "A": field `value` verification failed. pattern("\[.*\]")"#
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::Pattern::new(r#"\[.*\]"#).update_meta(&mut schema);
+    assert_eq!(schema.pattern.as_deref(), Some(r#"\[.*\]"#));
 }
 
 #[test]
@@ -158,6 +190,10 @@ fn test_max_items() {
             .into_message(),
         "failed to parse \"A\": field `values` verification failed. maxItems(3)"
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::MaxItems::new(10).update_meta(&mut schema);
+    assert_eq!(schema.max_items, Some(10));
 }
 
 #[test]
@@ -185,6 +221,10 @@ fn test_min_items() {
             .into_message(),
         "failed to parse \"A\": field `values` verification failed. minItems(4)"
     );
+
+    let mut schema = MetaSchema::new("string");
+    validation::MinItems::new(10).update_meta(&mut schema);
+    assert_eq!(schema.min_items, Some(10));
 }
 
 #[tokio::test]
