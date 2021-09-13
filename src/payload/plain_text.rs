@@ -24,17 +24,11 @@ impl Payload for PlainText {
         request: &Request,
         body: &mut RequestBody,
     ) -> Result<Self, ParseRequestError> {
-        if body.is_some() {
-            Ok(Self(String::from_request(request, body).await.map_err(
-                |err| ParseRequestError::ParseRequestBody {
-                    reason: err.to_string(),
-                },
-            )?))
-        } else {
-            Err(ParseRequestError::ParseRequestBody {
-                reason: "expect request body".to_string(),
-            })
-        }
+        Ok(Self(String::from_request(request, body).await.map_err(
+            |err| ParseRequestError::ParseRequestBody {
+                reason: err.to_string(),
+            },
+        )?))
     }
 }
 
