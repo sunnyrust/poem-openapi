@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use poem::{listener::TcpListener, Error, Result};
+use poem::{listener::TcpListener, route, Error, Result};
 use poem_openapi::{
     payload::{Binary, Json},
     types::multipart::Upload,
@@ -82,19 +82,20 @@ impl Api {
 #[tokio::main]
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:3000");
+    let api_service = OpenApiService::new(Api {
+        status: Mutex::new(Status {
+            id: 1,
+            files: Default::default(),
+        }),
+    })
+    .title("Upload Files")
+    .server("http://localhost:3000/api");
+    let ui = api_service.swagger_ui("http://localhost:3000");
+
     poem::Server::new(listener)
         .await
         .unwrap()
-        .run(
-            OpenApiService::new(Api {
-                status: Mutex::new(Status {
-                    id: 1,
-                    files: Default::default(),
-                }),
-            })
-            .title("Upload Files")
-            .ui_path("/ui"),
-        )
+        .run(route().nest("/api", api_service).nest("/", ui))
         .await
         .unwrap();
 }

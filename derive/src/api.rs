@@ -1,8 +1,14 @@
+use std::convert::TryFrom;
+
 use darling::{util::SpannedValue, FromMeta};
+use http::header::HeaderName;
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{AttributeArgs, Error, FnArg, ImplItem, ImplItemMethod, ItemImpl, ReturnType};
+use syn::{
+    AttributeArgs, Error, FnArg, ImplItem, ImplItemMethod, ItemImpl, Lit, Meta, NestedMeta, Path,
+    ReturnType,
+};
 
 use crate::{
     common_args::{APIMethod, DefaultValue, MaximumValidator, MinimumValidator, ParamIn},
@@ -27,7 +33,38 @@ struct APIOperation {
     #[darling(default)]
     deprecated: bool,
     #[darling(default, multiple, rename = "tag")]
-    tags: Vec<String>,
+    tags: Vec<Path>,
+}
+
+#[derive(Default)]
+struct Auth {
+    scopes: Vec<String>,
+}
+
+impl FromMeta for Auth {
+    fn from_meta(item: &Meta) -> darling::Result<Self> {
+        match item {
+            Meta::Path(_) => Ok(Default::default()),
+            Meta::List(ls) => {
+                let mut scopes = Vec::new();
+                for item in &ls.nested {
+                    if let NestedMeta::Lit(Lit::Str(s)) = item {
+                        scopes.push(s.value());
+                    } else {
+                        return Err(darling::Error::custom(
+                            "Incorrect scope definitions. #[oai(auth(\"read\", \"write\"))]",
+                        )
+                        .with_span(item));
+                    }
+                }
+                Ok(Self { scopes })
+            }
+            Meta::NameValue(_) => Err(darling::Error::custom(
+                "Incorrect scope definitions. #[oai(auth(\"read\", \"write\"))]",
+            )
+            .with_span(item)),
+        }
+    }
 }
 
 #[derive(FromMeta, Default)]
@@ -38,6 +75,8 @@ struct APIOperationParam {
     param_in: Option<ParamIn>,
     #[darling(default)]
     extract: bool,
+    #[darling(default)]
+    auth: Option<Auth>,
     #[darling(default)]
     desc: Option<String>,
     #[darling(default)]
@@ -72,6 +111,8 @@ struct Context {
     operations: IndexMap<String, Vec<TokenStream>>,
     request_types: Vec<TokenStream>,
     response_types: Vec<TokenStream>,
+    tags: Vec<TokenStream>,
+    security_schemes: Vec<TokenStream>,
 }
 
 pub(crate) fn generate(
@@ -89,6 +130,8 @@ pub(crate) fn generate(
         operations: Default::default(),
         request_types: Default::default(),
         response_types: Default::default(),
+        tags: Default::default(),
+        security_schemes: Default::default(),
     };
 
     for item in &mut item_impl.items {
@@ -111,7 +154,8 @@ pub(crate) fn generate(
         operations,
         request_types,
         response_types,
-        ..
+        tags,
+        security_schemes,
     } = ctx;
 
     let paths = {
@@ -140,17 +184,23 @@ pub(crate) fn generate(
         routes
     };
 
-    let register_schemas = {
-        let mut register_schemas = Vec::new();
+    let register_items = {
+        let mut register_items = Vec::new();
 
         for ty in request_types {
-            register_schemas.push(quote!(<#ty as #crate_name::Request>::register(registry);));
+            register_items.push(quote!(<#ty as #crate_name::Request>::register(registry);));
         }
         for ty in response_types {
-            register_schemas.push(quote!(<#ty as #crate_name::Response>::register(registry);));
+            register_items.push(quote!(<#ty as #crate_name::Response>::register(registry);));
+        }
+        for tag in tags {
+            register_items.push(quote!(#crate_name::Tags::register(&#tag, registry);));
+        }
+        for ty in security_schemes {
+            register_items.push(quote!(<#ty as #crate_name::SecurityScheme>::register(registry);));
         }
 
-        register_schemas
+        register_items
     };
 
     let expanded = quote! {
@@ -164,7 +214,7 @@ pub(crate) fn generate(
             }
 
             fn register(registry: &mut #crate_name::registry::Registry) {
-                #(#register_schemas)*
+                #(#register_items)*
             }
 
             fn add_routes(self, route: #crate_name::poem::route::Route) -> #crate_name::poem::route::Route {
@@ -231,6 +281,7 @@ fn generate_operation(
     let mut has_request_payload = false;
     let mut request_meta = quote!(::std::option::Option::None);
     let mut params_meta = Vec::new();
+    let mut security_requirement = quote!(::std::option::Option::None);
 
     for i in 1..item_method.sig.inputs.len() {
         let arg = &mut item_method.sig.inputs[i];
@@ -261,6 +312,25 @@ fn generate_operation(
                 use_args.push(pname);
             }
 
+            // is authorization extractor
+            Some(operation_param) if operation_param.auth.is_some() => {
+                let auth = operation_param.auth.as_ref().unwrap();
+                parse_args.push(quote! {
+                    let #pname = match <#arg_ty as #crate_name::SecurityScheme>::from_request(&request, &query.0) {
+                        ::std::result::Result::Ok(value) => value,
+                        ::std::result::Result::Err(err) if <#res_ty as #crate_name::Response>::BAD_REQUEST_HANDLER => {
+                                return ::std::result::Result::Ok(<#res_ty as #crate_name::Response>::from_parse_request_error(err));
+                            },
+                        ::std::result::Result::Err(err) => return ::std::result::Result::Err(::std::convert::Into::into(err)),
+                    };
+                });
+                use_args.push(pname);
+
+                let scopes = &auth.scopes;
+                security_requirement = quote!(::std::option::Option::Some((<#arg_ty as #crate_name::SecurityScheme>::NAME, ::std::vec![#(#scopes),*])));
+                ctx.security_schemes.push(quote!(#arg_ty));
+            }
+
             // is parameter
             Some(operation_param) => {
                 let param_oai_typename = match &operation_param.name {
@@ -268,27 +338,39 @@ fn generate_operation(
                     None => {
                         return Err(Error::new_spanned(
                             arg,
-                            r#"The request parameter is missing a name. #[oai(name = "...")]"#,
+                            r#"Missing a name. #[oai(name = "...")]"#,
                         )
                         .into())
                     }
                 };
 
-                let param_in =
-                    match operation_param.param_in {
-                        Some(param_in) => param_in,
-                        None => return Err(Error::new_spanned(
+                let param_in = match operation_param.param_in {
+                    Some(param_in) => param_in,
+                    None => {
+                        return Err(Error::new_spanned(
                             arg,
-                            r#"The request parameter is missing a input type. #[oai(in = "...")]"#,
+                            r#"Missing a input type. #[oai(in = "...")]"#,
                         )
-                        .into()),
-                    };
+                        .into())
+                    }
+                };
 
                 if param_in == ParamIn::Path && !path_vars.contains(&*param_oai_typename) {
                     return Err(Error::new_spanned(
                         arg,
                         format!(
                             "The parameter `{}` is not defined in the path.",
+                            param_oai_typename
+                        ),
+                    )
+                    .into());
+                } else if param_in == ParamIn::Header
+                    && HeaderName::try_from(&param_oai_typename).is_err()
+                {
+                    return Err(Error::new_spanned(
+                        arg,
+                        format!(
+                            "The parameter name `{}` is not a valid header name.",
                             param_oai_typename
                         ),
                     )
@@ -446,9 +528,15 @@ fn generate_operation(
         })
     });
 
+    let mut tag_names = Vec::new();
+    for tag in &tags {
+        ctx.tags.push(quote!(#tag));
+        tag_names.push(quote!(#crate_name::Tags::name(&#tag)));
+    }
+
     ctx.operations.entry(oai_path).or_default().push(quote! {
         #crate_name::registry::MetaOperation {
-            tags: ::std::vec![#(#tags),*],
+            tags: ::std::vec![#(#tag_names),*],
             method: #crate_name::poem::http::Method::#http_method,
             summary: #summary,
             description: #description,
@@ -456,6 +544,7 @@ fn generate_operation(
             request: #request_meta,
             responses: <#res_ty as #crate_name::Response>::meta(),
             deprecated: #deprecated,
+            security: ::std::vec![::std::iter::FromIterator::from_iter(::std::iter::IntoIterator::into_iter(#security_requirement))],
         }
     });
 

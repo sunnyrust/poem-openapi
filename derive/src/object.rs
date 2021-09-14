@@ -294,7 +294,7 @@ pub(crate) fn generate(args: DeriveInput) -> GeneratorResult<TokenStream> {
 
             impl #crate_name::types::ToJSON for #ident {
                 fn to_json(&self) -> #crate_name::serde_json::Value {
-                    let mut object = ::serde_json::Map::new();
+                    let mut object = ::#crate_name::serde_json::Map::new();
                     #(#serialize_fields)*
                     #crate_name::serde_json::Value::Object(object)
                 }

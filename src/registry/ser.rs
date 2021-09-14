@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{
     ser::{SerializeMap, SerializeStruct},
@@ -6,8 +6,8 @@ use serde::{
 };
 
 use crate::registry::{
-    MetaApi, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaSchemaRef, MetaServer, MetaTag,
-    Registry,
+    MetaApi, MetaInfo, MetaPath, MetaResponses, MetaSchema, MetaSchemaRef, MetaSecurityScheme,
+    MetaServer, Registry,
 };
 
 const OPENAPI_VERSION: &str = "3.0.0";
@@ -68,7 +68,6 @@ pub(crate) struct Document<'a> {
     pub(crate) info: Option<&'a MetaInfo>,
     pub(crate) servers: &'a [MetaServer],
     pub(crate) apis: &'a [MetaApi],
-    pub(crate) tags: &'a [MetaTag],
     pub(crate) registry: &'a Registry,
 }
 
@@ -77,6 +76,8 @@ impl<'a> Serialize for Document<'a> {
         #[derive(Serialize)]
         struct Components<'a> {
             schemas: &'a HashMap<&'static str, MetaSchema>,
+            #[serde(rename = "securitySchemes")]
+            security_schemes: &'a BTreeMap<&'static str, MetaSecurityScheme>,
         }
 
         let mut s = serializer.serialize_struct("OpenAPI", 6)?;
@@ -84,12 +85,13 @@ impl<'a> Serialize for Document<'a> {
         s.serialize_field("openapi", OPENAPI_VERSION)?;
         s.serialize_field("info", &self.info)?;
         s.serialize_field("servers", self.servers)?;
-        s.serialize_field("tags", self.tags)?;
+        s.serialize_field("tags", &self.registry.tags)?;
         s.serialize_field("paths", &PathMap(self.apis))?;
         s.serialize_field(
             "components",
             &Components {
                 schemas: &self.registry.schemas,
+                security_schemes: &self.registry.security_schemes,
             },
         )?;
 

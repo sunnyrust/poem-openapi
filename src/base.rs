@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use poem::{route::Route, IntoResponse, RequestBody, Result};
 
 use crate::{
@@ -105,6 +107,45 @@ impl<T: Payload + IntoResponse> Response for T {
     }
 }
 
+/// Represents a OpenAPI tags.
+pub trait Tags {
+    /// Register this tag type to registry.
+    fn register(&self, registry: &mut Registry);
+
+    /// Gets the tag name.
+    fn name(&self) -> &'static str;
+}
+
+/// Represents a OpenAPI security scheme.
+pub trait SecurityScheme: Sized {
+    /// The name of security scheme.
+    const NAME: &'static str;
+
+    /// Register this security scheme type to registry.
+    fn register(registry: &mut Registry);
+
+    /// Parse authorization information from request.
+    fn from_request(
+        req: &poem::Request,
+        query: &HashMap<String, String>,
+    ) -> Result<Self, ParseRequestError>;
+}
+
+impl<T: SecurityScheme> SecurityScheme for Option<T> {
+    const NAME: &'static str = T::NAME;
+
+    fn register(registry: &mut Registry) {
+        T::register(registry);
+    }
+
+    fn from_request(
+        req: &poem::Request,
+        query: &HashMap<String, String>,
+    ) -> Result<Self, ParseRequestError> {
+        Ok(T::from_request(req, query).ok())
+    }
+}
+
 /// Represents a OpenAPI object.
 pub trait OpenApi: Sized {
     /// Gets metadata of this API object.
@@ -122,7 +163,7 @@ pub trait OpenApi: Sized {
     }
 }
 
-/// API for the [`combine`](API::combine) method.
+/// API for the [`combine`](crate::OpenApi::combine) method.
 pub struct CombinedAPI<A, B>(A, B);
 
 impl<A: OpenApi, B: OpenApi> OpenApi for CombinedAPI<A, B> {

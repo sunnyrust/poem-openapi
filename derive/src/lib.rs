@@ -11,6 +11,8 @@ mod multipart;
 mod object;
 mod request;
 mod response;
+mod security_scheme;
+mod tags;
 mod utils;
 
 use proc_macro::TokenStream;
@@ -67,6 +69,24 @@ pub fn OpenApi(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn derive_multipart(input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(input as DeriveInput);
     match multipart::generate(args) {
+        Ok(stream) => stream.into(),
+        Err(err) => err.write_errors().into(),
+    }
+}
+
+#[proc_macro_derive(Tags, attributes(oai))]
+pub fn derive_tags(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as DeriveInput);
+    match tags::generate(args) {
+        Ok(stream) => stream.into(),
+        Err(err) => err.write_errors().into(),
+    }
+}
+
+#[proc_macro_derive(SecurityScheme, attributes(oai))]
+pub fn derive_security_scheme(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as DeriveInput);
+    match security_scheme::generate(args) {
         Ok(stream) => stream.into(),
         Err(err) => err.write_errors().into(),
     }

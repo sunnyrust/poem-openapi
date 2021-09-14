@@ -38,6 +38,8 @@ pub(crate) enum RenameTarget {
     Type,
     EnumItem,
     Field,
+    Tag,
+    SecurityScheme,
 }
 
 impl RenameTarget {
@@ -46,6 +48,8 @@ impl RenameTarget {
             RenameTarget::Type => RenameRule::Pascal,
             RenameTarget::EnumItem => RenameRule::ScreamingSnake,
             RenameTarget::Field => RenameRule::Camel,
+            RenameTarget::Tag => RenameRule::Snake,
+            RenameTarget::SecurityScheme => RenameRule::Snake,
         }
     }
 

@@ -1,4 +1,4 @@
-use poem::listener::TcpListener;
+use poem::{listener::TcpListener, route};
 use poem_openapi::{OpenApi, OpenApiService};
 
 struct Api1;
@@ -34,15 +34,15 @@ impl Api3 {
 #[tokio::main]
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:3000");
+    let api_service = OpenApiService::new(Api1.combine(Api2).combine(Api3))
+        .title("Combined APIs")
+        .server("http://localhost:3000/api");
+    let ui = api_service.swagger_ui("http://localhost:3000");
 
     poem::Server::new(listener)
         .await
         .unwrap()
-        .run(
-            OpenApiService::new(Api1.combine(Api2).combine(Api3))
-                .title("Combined APIs")
-                .ui_path("/"),
-        )
+        .run(route().nest("/api", api_service).nest("/", ui))
         .await
         .unwrap();
 }

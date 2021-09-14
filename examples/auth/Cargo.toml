@@ -1,0 +1,11 @@
+[package]
+name = "example-auth"
+version = "0.1.0"
+edition = "2018"
+publish = false
+
+[dependencies]
+poem = { version = "0.6.2", features = ["multipart", "tempfile"] }
+poem-openapi = { path = "../../" }
+tokio = { version = "1.11.0", features = ["macros", "rt-multi-thread"] }
+reqwest = { version = "0.11.4", default-features = false, features = ["rustls-tls"] }

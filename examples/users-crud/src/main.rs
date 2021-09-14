@@ -1,8 +1,16 @@
 use std::collections::HashMap;
 
-use poem::listener::TcpListener;
-use poem_openapi::{payload::Json, types::Password, Object, OpenApi, OpenApiService, Response};
+use poem::{listener::TcpListener, route};
+use poem_openapi::{
+    payload::Json, types::Password, Object, OpenApi, OpenApiService, Response, Tags,
+};
 use tokio::sync::Mutex;
+
+#[derive(Tags)]
+enum ApiTags {
+    /// Operations about user
+    User,
+}
 
 /// Create user schema
 #[derive(Debug, Object, Clone, Eq, PartialEq)]
@@ -75,7 +83,7 @@ struct Api {
 #[OpenApi]
 impl Api {
     /// Create a new user
-    #[oai(path = "/users", method = "post", tag = "user")]
+    #[oai(path = "/users", method = "post", tag = "ApiTags::User")]
     async fn create_user(&self, user: Json<User>) -> CreateUserResponse {
         let mut users = self.users.lock().await;
         if users.contains_key(&user.0.id) {
@@ -86,7 +94,7 @@ impl Api {
     }
 
     /// Find user by id
-    #[oai(path = "/users/:user_id", method = "get", tag = "user")]
+    #[oai(path = "/users/:user_id", method = "get", tag = "ApiTags::User")]
     async fn find_user(
         &self,
         #[oai(name = "user_id", in = "path", max_length = 20)] user_id: String,
@@ -99,7 +107,7 @@ impl Api {
     }
 
     /// Delete user by id
-    #[oai(path = "/users/:user_id", method = "delete", tag = "user")]
+    #[oai(path = "/users/:user_id", method = "delete", tag = "ApiTags::User")]
     async fn delete_user(
         &self,
         #[oai(name = "user_id", in = "path", max_length = 20)] user_id: String,
@@ -112,7 +120,7 @@ impl Api {
     }
 
     /// Update user by id
-    #[oai(path = "/users/:user_id", method = "put", tag = "user")]
+    #[oai(path = "/users/:user_id", method = "put", tag = "ApiTags::User")]
     async fn put_user(
         &self,
         #[oai(name = "user_id", in = "path", max_length = 20)] user_id: String,
@@ -137,17 +145,15 @@ impl Api {
 #[tokio::main]
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:3000");
+    let api_service = OpenApiService::new(Api::default())
+        .title("Users")
+        .server("http://localhost:3000/api");
+    let ui = api_service.swagger_ui("http://localhost:3000");
+
     poem::Server::new(listener)
         .await
         .unwrap()
-        .run(
-            OpenApiService::new(Api::default())
-                .title("Users")
-                .version("0.1.0")
-                .server_with_description("http://localhost:3000", "localhost")
-                .tag_with_description("user", "Operations about user")
-                .ui_path("/"),
-        )
+        .run(route().nest("/api", api_service).nest("/", ui))
         .await
         .unwrap();
 }

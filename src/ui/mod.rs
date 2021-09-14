@@ -1,13 +1,11 @@
 use askama::Template;
+use poem::{endpoint::make_sync, web::Html};
 
-use crate::poem::{
-    endpoint::make_sync,
-    route::{get, Route},
-    web::Html,
-};
+use crate::poem::Endpoint;
 
 const SWAGGER_UI_JS: &str = include_str!("swagger-ui-bundle.js");
 const SWAGGER_UI_CSS: &str = include_str!("swagger-ui.css");
+const OAUTH2_REDIRECT_HTML: &str = include_str!("oauth2-redirect.html");
 
 #[derive(Template)]
 #[template(
@@ -30,6 +28,8 @@ const SWAGGER_UI_CSS: &str = include_str!("swagger-ui.css");
     SwaggerUIBundle({
         dom_id: '#ui',
         spec: spec,
+        filter:false,
+        oauth2RedirectUrl: "{{ oauth2_redirect_url|safe }}"
     })
 </script>
 
@@ -40,20 +40,24 @@ struct UITemplate<'a> {
     spec: &'a str,
     script: &'static str,
     css: &'static str,
+    oauth2_redirect_url: &'a str,
 }
 
-pub fn add_ui_routes(route: Route, path: String, document: &str) -> Route {
-    route.at(
-        &path,
-        get(make_sync({
-            let html = UITemplate {
-                spec: document,
-                script: SWAGGER_UI_JS,
-                css: SWAGGER_UI_CSS,
-            }
-            .render()
-            .unwrap();
-            move |_| Html(html.clone())
-        })),
-    )
+pub(crate) fn create_ui_endpoint(absolute_uri: &str, document: &str) -> impl Endpoint {
+    let oauth2_redirect_url = format!("{}/oauth2-redirect.html", absolute_uri);
+    let index_html = UITemplate {
+        spec: document,
+        script: SWAGGER_UI_JS,
+        css: SWAGGER_UI_CSS,
+        oauth2_redirect_url: &oauth2_redirect_url,
+    }
+    .render()
+    .unwrap();
+
+    poem::route()
+        .at("/", make_sync(move |_| Html(index_html.clone())))
+        .at(
+            "/oauth2-redirect.html",
+            make_sync(move |_| Html(OAUTH2_REDIRECT_HTML.to_string())),
+        )
 }

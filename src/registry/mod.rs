@@ -1,6 +1,10 @@
 mod ser;
 
-use std::collections::HashMap;
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap, HashSet},
+    hash::{Hash, Hasher},
+};
 
 use poem::http::Method;
 pub(crate) use ser::Document;
@@ -252,8 +256,10 @@ pub struct MetaOperation {
     #[serde(rename = "requestBody", skip_serializing_if = "Option::is_none")]
     pub request: Option<MetaRequest>,
     pub responses: MetaResponses,
-    #[serde(rename = "parameters", skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "is_false")]
     pub deprecated: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub security: Vec<HashMap<&'static str, Vec<&'static str>>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -264,21 +270,113 @@ pub struct MetaPath {
 
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct MetaInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<&'static str>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct MetaServer {
     pub url: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct MetaTag {
     pub name: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'static str>,
+}
+
+impl PartialEq for MetaTag {
+    fn eq(&self, other: &Self) -> bool {
+        self.name.eq(other.name)
+    }
+}
+
+impl Eq for MetaTag {}
+
+impl PartialOrd for MetaTag {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.name.partial_cmp(other.name)
+    }
+}
+
+impl Ord for MetaTag {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name.cmp(other.name)
+    }
+}
+
+impl Hash for MetaTag {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaOAuthFlow {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_url: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_url: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_url: Option<&'static str>,
+    #[serde(
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_oauth_flow_scopes"
+    )]
+    pub scopes: Vec<(&'static str, &'static str)>,
+}
+
+fn serialize_oauth_flow_scopes<S: Serializer>(
+    properties: &[(&'static str, &'static str)],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let mut s = serializer.serialize_map(None)?;
+    for item in properties {
+        s.serialize_entry(item.0, &item.1)?;
+    }
+    s.end()
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaOAuthFlows {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub implicit: Option<MetaOAuthFlow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<MetaOAuthFlow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_credentials: Option<MetaOAuthFlow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_code: Option<MetaOAuthFlow>,
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaSecurityScheme {
+    #[serde(rename = "type")]
+    pub ty: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<&'static str>,
+    #[serde(rename = "in", skip_serializing_if = "Option::is_none")]
+    pub key_in: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bearer_format: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flows: Option<MetaOAuthFlows>,
+    #[serde(rename = "openIdConnectUrl", skip_serializing_if = "Option::is_none")]
+    pub openid_connect_url: Option<&'static str>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -289,6 +387,8 @@ pub struct MetaApi {
 #[derive(Default)]
 pub struct Registry {
     pub schemas: HashMap<&'static str, MetaSchema>,
+    pub tags: HashSet<MetaTag>,
+    pub security_schemes: BTreeMap<&'static str, MetaSecurityScheme>,
 }
 
 impl Registry {
@@ -306,6 +406,20 @@ impl Registry {
             self.schemas.insert(name, MetaSchema::new("fake"));
             let meta_schema = f(self);
             *self.schemas.get_mut(name).unwrap() = meta_schema;
+        }
+    }
+
+    pub fn create_tag(&mut self, tag: MetaTag) {
+        self.tags.insert(tag);
+    }
+
+    pub fn create_security_scheme(
+        &mut self,
+        name: &'static str,
+        security_scheme: MetaSecurityScheme,
+    ) {
+        if !self.security_schemes.contains_key(name) {
+            self.security_schemes.insert(name, security_scheme);
         }
     }
 }

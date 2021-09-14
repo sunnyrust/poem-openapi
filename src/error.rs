@@ -1,3 +1,4 @@
+use poem::http::StatusCode;
 use thiserror::Error;
 
 /// This type represents errors that occur when parsing the HTTP request.
@@ -34,6 +35,10 @@ pub enum ParseRequestError {
     /// Poem extractor error.
     #[error("poem extract error: {0}")]
     Extractor(String),
+
+    /// Authorization error.
+    #[error("authorization error")]
+    Authorization,
 }
 
 impl From<ParseRequestError> for poem::Error {
@@ -46,6 +51,7 @@ impl From<ParseRequestError> for poem::Error {
             }
             ParseRequestError::ExpectContentType => poem::Error::method_not_allowed(err),
             ParseRequestError::Extractor(_) => poem::Error::bad_request(err),
+            ParseRequestError::Authorization => poem::Error::new(StatusCode::UNAUTHORIZED),
         }
     }
 }

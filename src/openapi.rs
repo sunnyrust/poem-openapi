@@ -1,8 +1,9 @@
 use poem::{route, route::Route, IntoEndpoint};
 
 use crate::{
-    registry::{Document, MetaInfo, MetaServer, MetaTag, Registry},
-    ui::add_ui_routes,
+    poem::Endpoint,
+    registry::{Document, MetaInfo, MetaServer, Registry},
+    ui::create_ui_endpoint,
     OpenApi,
 };
 
@@ -11,8 +12,6 @@ pub struct OpenApiService<T> {
     api: T,
     info: Option<MetaInfo>,
     servers: Vec<MetaServer>,
-    tags: Vec<MetaTag>,
-    ui_path: Option<String>,
 }
 
 impl<T> OpenApiService<T> {
@@ -23,8 +22,6 @@ impl<T> OpenApiService<T> {
             api,
             info: None,
             servers: Vec::new(),
-            tags: Vec::new(),
-            ui_path: None,
         }
     }
 
@@ -78,38 +75,25 @@ impl<T> OpenApiService<T> {
         self
     }
 
-    /// Appends a tag to the API container.
-    ///
-    /// Reference: <https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.0.md#tagObject>
+    /// Create the Swagger UI endpoint.
     #[must_use]
-    pub fn tag(mut self, name: &'static str) -> Self {
-        self.tags.push(MetaTag {
-            name,
-            description: None,
-        });
-        self
-    }
+    pub fn swagger_ui(&self, absolute_uri: impl AsRef<str>) -> impl Endpoint
+    where
+        T: OpenApi,
+    {
+        let mut registry = Registry::new();
+        let metadata = T::meta();
 
-    /// Appends a tag and description to the API container.
-    #[must_use]
-    pub fn tag_with_description(mut self, name: &'static str, description: &'static str) -> Self {
-        self.tags.push(MetaTag {
-            name,
-            description: Some(description),
-        });
-        self
-    }
+        T::register(&mut registry);
 
-    /// Sets the URL path to access Swagger UI.
-    ///
-    /// NOTE: You must set this path before the API container will create a
-    /// route to Swagger UI.
-    #[must_use]
-    pub fn ui_path(self, path: impl Into<String>) -> Self {
-        Self {
-            ui_path: Some(path.into()),
-            ..self
-        }
+        let doc = Document {
+            info: self.info.as_ref(),
+            servers: &self.servers,
+            apis: &metadata,
+            registry: &registry,
+        };
+        let doc_json = serde_json::to_string_pretty(&doc).unwrap();
+        create_ui_endpoint(absolute_uri.as_ref(), &doc_json)
     }
 }
 
@@ -117,25 +101,6 @@ impl<T: OpenApi> IntoEndpoint for OpenApiService<T> {
     type Endpoint = Route;
 
     fn into_endpoint(self) -> Self::Endpoint {
-        let mut route = self.api.add_routes(route());
-
-        if let Some(ui_path) = self.ui_path {
-            let mut registry = Registry::new();
-            let metadata = T::meta();
-
-            T::register(&mut registry);
-
-            let doc = Document {
-                info: self.info.as_ref(),
-                servers: &self.servers,
-                apis: &metadata,
-                tags: &self.tags,
-                registry: &registry,
-            };
-            let doc_json = serde_json::to_string_pretty(&doc).unwrap();
-            route = add_ui_routes(route, ui_path, &doc_json);
-        }
-
-        route
+        self.api.add_routes(route())
     }
 }
