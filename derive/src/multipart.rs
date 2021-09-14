@@ -46,6 +46,8 @@ struct MultipartField {
     max_items: Option<SpannedValue<usize>>,
     #[darling(default)]
     min_items: Option<SpannedValue<usize>>,
+    #[darling(default)]
+    unique_items: bool,
 }
 
 impl_has_validators!(MultipartField);

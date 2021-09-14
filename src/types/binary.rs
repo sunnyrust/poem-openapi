@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Represents a binary data.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Binary(pub Vec<u8>);
 
 impl Type for Binary {

@@ -62,6 +62,8 @@ pub struct MetaSchema {
     pub max_items: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_items: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unique_items: Option<bool>,
 }
 
 fn serialize_properties<S: Serializer>(
@@ -98,6 +100,7 @@ impl MetaSchema {
             pattern: None,
             max_items: None,
             min_items: None,
+            unique_items: None,
         }
     }
 }

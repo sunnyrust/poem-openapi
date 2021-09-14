@@ -227,6 +227,32 @@ fn test_min_items() {
     assert_eq!(schema.min_items, Some(10));
 }
 
+#[test]
+fn test_unique_items() {
+    #[derive(Object, Debug, Eq, PartialEq)]
+    struct A {
+        #[oai(unique_items)]
+        values: Vec<String>,
+    }
+
+    assert_eq!(
+        A::parse_from_json(json!({ "values": ["1", "2", "3"] })).unwrap(),
+        A {
+            values: vec!["1".to_string(), "2".to_string(), "3".to_string(),],
+        }
+    );
+    assert_eq!(
+        A::parse_from_json(json!({ "values": ["1", "2", "2"] }))
+            .unwrap_err()
+            .into_message(),
+        "failed to parse \"A\": field `values` verification failed. uniqueItems()"
+    );
+
+    let mut schema = MetaSchema::new("string");
+    validation::UniqueItems.update_meta(&mut schema);
+    assert_eq!(schema.unique_items, Some(true));
+}
+
 #[tokio::test]
 async fn param_validator() {
     struct Api;

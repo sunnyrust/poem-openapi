@@ -18,6 +18,7 @@ pub(crate) struct Validators<'a> {
     pub(crate) pattern: &'a Option<SpannedValue<String>>,
     pub(crate) max_items: &'a Option<SpannedValue<usize>>,
     pub(crate) min_items: &'a Option<SpannedValue<usize>>,
+    pub(crate) unique_items: &'a bool,
 }
 
 impl<'a> Validators<'a> {
@@ -82,6 +83,11 @@ impl<'a> Validators<'a> {
             // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.11
             let value = &**value;
             validators.push(quote!(#crate_name::validation::MinItems::new(#value)));
+        }
+
+        if *self.unique_items {
+            // https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-00#section-5.12
+            validators.push(quote!(#crate_name::validation::UniqueItems::new()));
         }
 
         Ok(validators)
@@ -190,6 +196,7 @@ macro_rules! impl_has_validators {
                     pattern: &self.pattern,
                     max_items: &self.max_items,
                     min_items: &self.min_items,
+                    unique_items: &self.unique_items,
                 }
             }
         }

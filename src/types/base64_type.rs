@@ -7,6 +7,7 @@ use crate::{
 };
 
 /// Represents a binary data encoded with base64.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Base64(pub Vec<u8>);
 
 impl Type for Base64 {

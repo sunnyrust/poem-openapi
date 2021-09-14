@@ -8,6 +8,7 @@ mod min_length;
 mod minimum;
 mod multiple_of;
 mod pattern;
+mod unique_items;
 
 pub use max_items::MaxItems;
 pub use max_length::MaxLength;
@@ -17,6 +18,7 @@ pub use min_length::MinLength;
 pub use minimum::Minimum;
 pub use multiple_of::MultipleOf;
 pub use pattern::Pattern;
+pub use unique_items::UniqueItems;
 
 use crate::registry::MetaSchema;
 
