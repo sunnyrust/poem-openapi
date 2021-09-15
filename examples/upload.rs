@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use poem::{listener::TcpListener, Error, Result};
 use poem_openapi::{
-    payload::Json, types::multipart::Upload, Multipart, Object, OpenApi, OpenApiService, Response,
+    payload::{Binary, Json},
+    types::multipart::Upload,
+    Multipart, Object, OpenApi, OpenApiService, Response,
 };
 use tokio::sync::Mutex;
 
@@ -12,14 +14,13 @@ struct File {
     desc: Option<String>,
     content_type: Option<String>,
     filename: Option<String>,
-    /// UTF8 encoded text file
-    data: String,
+    data: Vec<u8>,
 }
 
 #[derive(Debug, Response)]
 enum GetFileResponse {
     #[oai(status = 200)]
-    Ok(Json<File>),
+    Ok(Binary, #[oai(header = "Content-Disposition")] String),
     /// File not found
     #[oai(status = 404)]
     NotFound,
@@ -55,11 +56,7 @@ impl Api {
             desc: upload.desc,
             content_type: upload.file.content_type().map(ToString::to_string),
             filename: upload.file.file_name().map(ToString::to_string),
-            data: upload
-                .file
-                .into_string()
-                .await
-                .map_err(Error::bad_request)?,
+            data: upload.file.into_vec().await.map_err(Error::bad_request)?,
         };
         status.files.insert(id, file);
         Ok(Json(id))
@@ -70,7 +67,13 @@ impl Api {
     async fn get(&self, #[oai(name = "id", in = "path")] id: u64) -> GetFileResponse {
         let status = self.status.lock().await;
         match status.files.get(&id) {
-            Some(file) => GetFileResponse::Ok(Json(file.clone())),
+            Some(file) => {
+                let mut content_disposition = String::from("attachment");
+                if let Some(file_name) = &file.filename {
+                    content_disposition += &format!("; filename={}", file_name);
+                }
+                GetFileResponse::Ok(file.data.clone().into(), content_disposition)
+            }
             None => GetFileResponse::NotFound,
         }
     }
